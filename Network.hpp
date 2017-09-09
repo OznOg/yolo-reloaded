@@ -1,3 +1,4 @@
+#pragma once
 
 #include <Layer.hpp>
 
@@ -97,8 +98,7 @@ public:
 
     int _batch = 1;
     size_t _subdivisions = 1;
-    size_t _width = 0;
-    size_t _height = 0;
+    Size   _input_size; // FIXME name not really clear...
     size_t _channels = 0;
     float _momentum = .9;
     float _decay = .0001;
@@ -113,6 +113,10 @@ public:
 
     void setPolicy(std::unique_ptr<Policy> policy) {
 	_policy = std::move(policy);
+    }
+
+    void addLayer(std::unique_ptr<Layer> layer) {
+	_layers.push_back(std::move(layer));
     }
 
 private:

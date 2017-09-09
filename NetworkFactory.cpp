@@ -4,6 +4,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <type_traits>
+#include <Size.hpp>
 
 namespace yolo {
 
@@ -165,23 +166,42 @@ static std::unique_ptr<Network> makeNetwork(const ConfigHunk &config) {
 
 
     std::unique_ptr<Network> net(new Network()); 
-    net->_batch           = config.getScalar<int>("batch");
-    net->_subdivisions    = config.getScalar<size_t>("subdivisions");
-    net->_width           = config.getScalar<size_t>("width");
-    net->_height          = config.getScalar<size_t>("height");
-    net->_channels        = config.getScalar<size_t>("channels");
-    net->_momentum        = config.getScalar<float>("momentum");
-    net->_decay           = config.getScalar<float>("decay");
-    net->_angle           = config.getScalar<float>("angle");
-    net->_saturation      = config.getScalar<float>("saturation");
-    net->_exposure        = config.getScalar<float>("exposure");
-    net->_hue             = config.getScalar<float>("hue");
-    net->_learning_rate   = config.getScalar<float>("learning_rate");
-    net->_burn_in         = config.getScalar<size_t>("burn_in");
-    net->_max_batches     = config.getScalar<size_t>("max_batches");
+    net->_batch             = config.getScalar<int>("batch");
+    net->_subdivisions      = config.getScalar<size_t>("subdivisions");
+    net->_input_size.width  = config.getScalar<size_t>("width");
+    net->_input_size.height = config.getScalar<size_t>("height");
+    net->_channels          = config.getScalar<size_t>("channels");
+    net->_momentum          = config.getScalar<float>("momentum");
+    net->_decay             = config.getScalar<float>("decay");
+    net->_angle             = config.getScalar<float>("angle");
+    net->_saturation        = config.getScalar<float>("saturation");
+    net->_exposure          = config.getScalar<float>("exposure");
+    net->_hue               = config.getScalar<float>("hue");
+    net->_learning_rate     = config.getScalar<float>("learning_rate");
+    net->_burn_in           = config.getScalar<size_t>("burn_in");
+    net->_max_batches       = config.getScalar<size_t>("max_batches");
 
     net->setPolicy(makePolicy(config));
     return net;
+}
+
+static std::unique_ptr<Layer> makeLayer(const ConfigHunk &config) {
+    std::string layer_name = config.getName().substr(1, config.getName().size() - 2); // remove [] around name
+
+    if (layer_name == "convolutional") {
+	bool batch_normalize   = config.getScalar<bool>("batch_normalize");
+	size_t filters         = config.getScalar<size_t>("filters");
+	size_t size            = config.getScalar<size_t>("size");
+	size_t stride          = config.getScalar<size_t>("stride");
+	bool pad               = config.getScalar<bool>("pad");
+	size_t padding         = pad ? size / 2 : 0;
+	Activation activation  = activationFromString(config.getScalar<std::string>("activation"));
+
+	return std::unique_ptr<Layer>(new ConvolutionalLayer(batch_normalize, filters, size, stride, padding, activation));
+    } else {
+	throw std::invalid_argument("Unhandled layer type '" + layer_name + "'");
+    }
+    return {};
 }
 
 std::unique_ptr<Network> NetworkFactory::createFromString(const std::string &content) {
@@ -192,8 +212,8 @@ std::unique_ptr<Network> NetworkFactory::createFromString(const std::string &con
     auto net = makeNetwork(networkConfig);
 
     while (!local_copy.empty()) {
-	const auto &head = popConfigHunk(local_copy);
-	std::cout << "====> " << head.getName() << "<===" << std::endl;
+	const auto &layerConfig = popConfigHunk(local_copy);
+	net->addLayer(makeLayer(layerConfig));
     }
  
     return net;

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <Network.hpp>
 #include <memory>
 
