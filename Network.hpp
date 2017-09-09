@@ -116,7 +116,10 @@ public:
     }
 
     void addLayer(std::unique_ptr<Layer> layer) {
-	layer->setInputFormat(_input_size, _channels, _batch);
+	/* For the first layer we give the network input size; for next ones,
+	 * each layer N gets the output size of the layer N - 1 */
+	const auto &size = _layers.empty() ? _input_size : _layers.back()->getOutputSize();
+	layer->setInputFormat(size, _channels, _batch);
 	_layers.push_back(std::move(layer));
     }
 

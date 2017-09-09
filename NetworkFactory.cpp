@@ -198,6 +198,14 @@ static std::unique_ptr<Layer> makeLayer(const ConfigHunk &config) {
 	Activation activation  = activationFromString(config.getScalar<std::string>("activation"));
 
 	return std::unique_ptr<Layer>(new ConvolutionalLayer(batch_normalize, filters, size, stride, padding, activation));
+    } else if (layer_name == "maxpool") {
+	size_t stride          = config.getScalar<size_t>("stride");
+	size_t size            = config.getScalar<size_t>("size");
+	size_t padding;
+	try { padding = config.getScalar<size_t>("padding"); }
+	catch (...) { padding = (size - 1) / 2; }
+
+	return std::unique_ptr<Layer>(new MaxpoolLayer(size, stride, padding));
     } else {
 	throw std::invalid_argument("Unhandled layer type '" + layer_name + "'");
     }

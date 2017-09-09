@@ -11,6 +11,18 @@ class Layer {
 public:
     virtual void setInputFormat(const Size &s, size_t channels, size_t batch) = 0;
     virtual ~Layer() {}
+
+    const Size &getOutputSize() {
+	return _output_size;
+    }
+
+protected:
+    void setOutputSize(const Size &s) {
+	_output_size = s;
+    }
+
+private:
+    Size _output_size;
 };
 
 
@@ -60,12 +72,13 @@ public:
 	_weights.resize(channels * _filters * _size * _size);
 	_weights_updates.resize(_weights.size());
 
-	_output_size = (_input_size + 2 * _padding - _size) / _stride + 1;
-	_output.resize(_output_size.width * _output_size.height * _filters * batch);
+	setOutputSize((_input_size + 2 * _padding - _size) / _stride + 1);
+
+	_output.resize(getOutputSize().width * getOutputSize().height * _filters * batch);
 
 	_delta.resize(_output.size());
 
-        _workspace_size = _output_size.width * _output_size.height * channels * _size * _size * sizeof(float);
+        _workspace_size = getOutputSize().width * getOutputSize().height * channels * _size * _size * sizeof(float);
 
 	if (_batch_normalize) {
 	    _scales.resize(_filters, 1.);
@@ -87,7 +100,6 @@ public:
 
 private:
     Size   _input_size;
-    Size   _output_size;
     bool   _batch_normalize = false;
     size_t _filters = 1;
     size_t _size = 1;
@@ -122,6 +134,32 @@ private:
     // end of batch stuff
 };
 
+class MaxpoolLayer : public Layer {
+public:
+    MaxpoolLayer(size_t size, size_t stride, size_t padding) : _size(size), _stride(stride), _padding(padding) {}
 
+    void setInputFormat(const Size &s, size_t channels, size_t batch) override {
+	_input_size = s;
+	_channels = channels;
+	setOutputSize((_input_size + 2 * _padding) / _stride);
+
+	size_t new_data_size = getOutputSize().width * getOutputSize().height * channels * batch;
+	_indexes.resize(new_data_size);
+	_output.resize(new_data_size);
+	_delta.resize(new_data_size);
+    }
+
+private:
+    Size   _input_size;
+    size_t _channels;
+    size_t _size;
+    size_t _stride;
+    size_t _padding;
+
+    std::vector<size_t> _indexes;
+    std::vector<float>  _output;
+    std::vector<float>  _delta;
+
+};
 
 }
