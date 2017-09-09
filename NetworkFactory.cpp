@@ -38,6 +38,7 @@ class ConfigHunk {
 		throw std::invalid_argument("Entry parsing error.");
 
 	    key = optionLine.substr(0, equalPos);
+	    key.erase(key.find_last_not_of(" ") + 1); //trim
 
 	    std::string value;
 	    std::stringstream valueStream(optionLine.substr(equalPos + 1, std::string::npos));
@@ -64,13 +65,17 @@ public:
 
     template <class T>
     T getScalar(const std::string &key) const {
-	static_assert(std::is_scalar<T>::value, "Trying to pick a non scalar value; for non scalar, use vector specialization.");
+	static_assert(std::is_scalar<T>::value || std::is_same<std::string, T>::value,
+                      "Trying to pick a non scalar value; for non scalar, use vector specialization.");
 	for (const auto &e : _entries)
 	    if (e.key == key) {
 		if (e.values.size() != 1) 
 		    throw std::invalid_argument("Trying to pick a vector as scalar.");
 		
-		return e.values[0];
+		T numeric_val;
+		std::istringstream ss(e.values[0]);
+		ss >> numeric_val;
+		return numeric_val;
 	    }
 	throw std::invalid_argument("No matching key '" + key + "' found.");
     };
@@ -117,33 +122,84 @@ static ConfigHunk popConfigHunk(std::string &remaining_content) {
 }
 
 
-static Network makeNetwork(const ConfigHunk &config) {
+static std::unique_ptr<Policy> makePolicy(const ConfigHunk &config) {
+    if (config.getName() != "[net]" && config.getName() != "[network]")
+	throw std::invalid_argument("Need a network configuration for creating policy.");
+    
+    std::unique_ptr<Policy> policy;
+
+    const auto &policy_name = config.getScalar<std::string>("policy");
+
+    if (policy_name == "steps") {
+	const auto &ranks = config.getVector<int>("steps");
+	const auto &scales = config.getVector<float>("steps");
+	if (ranks.size() != scales.size())
+	    throw std::invalid_argument("Inconsistant policy configuration, scales count do not match steps count");
+
+	std::vector<StepsPolicy::Step> steps;
+	for (size_t i = 0; i < ranks.size(); i++) {
+	    steps.push_back(StepsPolicy::Step(ranks[i], scales[i]));
+	}
+	policy.reset(new StepsPolicy(steps));
+
+
+#if 0
+    // FIXME  well I don't really know how to test thos policies as I have no config file using them...
+    } else if (policy_name == "poly") {
+    } else if (policy_name == "constant") {
+    } else if (policy_name == "sigmoid") {
+    } else if (policy_name == "step") {
+    } else if (policy_name == "exp") {
+    } else if (policy_name == "random") {
+#endif
+    } else {
+	throw std::invalid_argument("Unhandled policy type '" + policy_name + "'");
+    }
+
+    return policy;
+}
+
+static std::unique_ptr<Network> makeNetwork(const ConfigHunk &config) {
     if (config.getName() != "[net]" && config.getName() != "[network]")
 	throw std::invalid_argument("Inconsistant configuration (network not found at top level)");
 
-    const auto &steps = config.getVector<int>("steps");
-    for (const auto &s : steps)
-	std::cout << "step ====> " << s << "<===" << std::endl;
 
-    return {};
+    std::unique_ptr<Network> net(new Network()); 
+    net->_batch           = config.getScalar<int>("batch");
+    net->_subdivisions    = config.getScalar<size_t>("subdivisions");
+    net->_width           = config.getScalar<size_t>("width");
+    net->_height          = config.getScalar<size_t>("height");
+    net->_channels        = config.getScalar<size_t>("channels");
+    net->_momentum        = config.getScalar<float>("momentum");
+    net->_decay           = config.getScalar<float>("decay");
+    net->_angle           = config.getScalar<float>("angle");
+    net->_saturation      = config.getScalar<float>("saturation");
+    net->_exposure        = config.getScalar<float>("exposure");
+    net->_hue             = config.getScalar<float>("hue");
+    net->_learning_rate   = config.getScalar<float>("learning_rate");
+    net->_burn_in         = config.getScalar<size_t>("burn_in");
+    net->_max_batches     = config.getScalar<size_t>("max_batches");
+
+    net->setPolicy(makePolicy(config));
+    return net;
 }
 
-Network NetworkFactory::createFromString(const std::string &content) {
+std::unique_ptr<Network> NetworkFactory::createFromString(const std::string &content) {
     auto local_copy = content;
 
     //file Content MUST begin with network stuff
     const auto &networkConfig = popConfigHunk(local_copy);
-    Network net = makeNetwork(networkConfig);
+    auto net = makeNetwork(networkConfig);
 
     while (!local_copy.empty()) {
 	const auto &head = popConfigHunk(local_copy);
 	std::cout << "====> " << head.getName() << "<===" << std::endl;
     }
  
-    return {};
+    return net;
 }
 
-Network NetworkFactory::createFromFile(const std::string &fileName) {
+std::unique_ptr<Network> NetworkFactory::createFromFile(const std::string &fileName) {
     std::string file_content = getFileContent(fileName);
 
     return createFromString(file_content);

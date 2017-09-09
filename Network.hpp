@@ -34,6 +34,14 @@ private:
 
 class StepsPolicy : public Policy {
 public:
+    struct Step {
+	size_t rank;
+	float scale;
+	Step(size_t aRank, float aScale) : rank(aRank), scale(aScale) {}
+    };
+
+    StepsPolicy(const std::vector<Step> &steps) : _steps(steps) {}
+
     float get_current_rate_ratio(size_t current_batch) const override {
 	float ratio = 1;
 	for (const auto &step : _steps) {
@@ -44,10 +52,6 @@ public:
 	return ratio;
     }
 
-    struct Step {
-	size_t rank;
-	float scale;
-    };
 private:
     std::vector<Step> _steps;
 };
@@ -91,8 +95,6 @@ private:
 class Network {
 public:
 
-private:
-    std::vector<std::unique_ptr<Layer>> _layers;
     int _batch = 1;
     size_t _subdivisions = 1;
     size_t _width = 0;
@@ -109,6 +111,12 @@ private:
     size_t _burn_in = 0;
     size_t _max_batches = 0;
 
+    void setPolicy(std::unique_ptr<Policy> policy) {
+	_policy = std::move(policy);
+    }
+
+private:
+    std::vector<std::unique_ptr<Layer>> _layers;
     std::unique_ptr<Policy> _policy;
 };
 

@@ -9,5 +9,7 @@ set(CMAKE_CXX_FLAGS "-std=c++14 -Wall -Werror -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -ggdb")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-add_executable(darknet darknet.cpp)
+include_directories(.)
+
+add_executable(darknet darknet.cpp NetworkFactory.cpp)
 

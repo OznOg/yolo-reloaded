@@ -1,13 +1,20 @@
+#include <NetworkFactory.hpp>
+
+#include <exception>
 #include <iostream>
 #include <string>
 #include <vector>
 
+using namespace yolo;
 
 bool run_detect(const std::vector<std::string> &args) {
     if (args.size() < 2) {
 	std::cerr << "usage: detect needs at least 2 parameters." << std::endl << std::endl;
         return false;
     }
+
+    NetworkFactory().createFromFile(args[0]);
+
     return true;
 }
 
@@ -25,13 +32,14 @@ int main(int argc, char **argv) {
 	return 2;
     }
 
-    if (!run_detect(std::vector<std::string>(&args[2], &args[args.size()]))) {
-	std::cerr << "Error: Detection failed." << std::endl << std::endl;
-	return 3;
+    try {
+	if (!run_detect(std::vector<std::string>(&args[2], &args[args.size()]))) {
+	    std::cerr << "Error: Detection failed." << std::endl << std::endl;
+	    return 3;
+	}
+    } catch (std::exception &e) {
+	std::cerr << "Failed:" << e.what() << std::endl;
     }
-
-    for (const auto &a : args)
-	std::cout << a << std::endl;
 
     return 0;
 }
