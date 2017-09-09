@@ -116,6 +116,7 @@ public:
     }
 
     void addLayer(std::unique_ptr<Layer> layer) {
+	layer->setInputFormat(_input_size, _channels, _batch);
 	_layers.push_back(std::move(layer));
     }
 

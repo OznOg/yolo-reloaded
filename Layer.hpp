@@ -9,6 +9,7 @@ namespace yolo {
 
 class Layer {
 public:
+    virtual void setInputFormat(const Size &s, size_t channels, size_t batch) = 0;
     virtual ~Layer() {}
 };
 
@@ -52,21 +53,73 @@ public:
     ConvolutionalLayer(bool batch_normalize, size_t filters,
                        size_t size, size_t stride, size_t padding, Activation activation) :
          _batch_normalize(batch_normalize), _filters(filters), _size(size), 
-	 _stride(stride), _padding(padding), _activation(activation), _weights() {}
+	 _stride(stride), _padding(padding), _activation(activation), _weights(), _biases(filters), _bias_updates(filters) {}
+
+    void setInputFormat(const Size &s, size_t channels, size_t batch) override {
+	_input_size = s;
+	_weights.resize(channels * _filters * _size * _size);
+	_weights_updates.resize(_weights.size());
+
+	_output_size = (_input_size + 2 * _padding - _size) / _stride + 1;
+	_output.resize(_output_size.width * _output_size.height * _filters * batch);
+
+	_delta.resize(_output.size());
+
+        _workspace_size = _output_size.width * _output_size.height * channels * _size * _size * sizeof(float);
+
+	if (_batch_normalize) {
+	    _scales.resize(_filters, 1.);
+	    _scale_updates.resize(_filters);
+
+	    _mean.resize(_filters);
+	    _variance.resize(_filters);
+
+	    _mean_delta.resize(_filters);
+	    _variance_delta.resize(_filters);
+
+	    _rolling_mean.resize(_filters);
+	    _rolling_variance.resize(_filters);
+
+	    _x.resize(_output.size());
+	    _x_norm.resize(_output.size());
+	}
+    }
+
 private:
     Size   _input_size;
+    Size   _output_size;
     bool   _batch_normalize = false;
     size_t _filters = 1;
     size_t _size = 1;
     size_t _stride = 1;
     size_t _padding;
     Activation _activation = Activation::Leaky;
+    size_t _workspace_size; // FIXME what is this used for?
 
     std::vector<float> _weights;
     std::vector<float> _weights_updates;
 
     std::vector<float> _biases;
     std::vector<float> _bias_updates;
+
+    std::vector<float> _output;
+    std::vector<float> _delta;
+
+
+    // batch stuff
+    // FIXME is that really usefull? would it be better to have a dedicated struct?
+    std::vector<float> _scales;
+    std::vector<float> _scale_updates;
+    std::vector<float> _mean;
+    std::vector<float> _variance;
+    std::vector<float> _mean_delta;
+    std::vector<float> _variance_delta;
+    std::vector<float> _rolling_mean;
+    std::vector<float> _rolling_variance;
+    std::vector<float> _x; // FIXME WTF is x?
+    std::vector<float> _x_norm; // FIXME WTF is x?
+
+    // end of batch stuff
 };
 
 
