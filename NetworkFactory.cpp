@@ -1,6 +1,7 @@
 #include <NetworkFactory.hpp>
 #include <iostream>
 #include <fstream>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <type_traits>
@@ -65,7 +66,7 @@ public:
     }
 
     template <class T>
-    T getScalar(const std::string &key) const {
+    std::optional<T> getScalar(const std::string &key) const {
 	static_assert(std::is_scalar<T>::value || std::is_same<std::string, T>::value,
                       "Trying to pick a non scalar value; for non scalar, use vector specialization.");
 	for (const auto &e : _entries)
@@ -78,11 +79,11 @@ public:
 		ss >> numeric_val;
 		return numeric_val;
 	    }
-	throw std::invalid_argument("No matching key '" + key + "' found.");
+        return {}; // not found
     };
 
     template <class T>
-    std::vector<T> getVector(const std::string &key) const {
+    std::optional<std::vector<T>> getVector(const std::string &key) const {
 	for (const auto &e : _entries)
 	    if (e.key == key) {
 		std::vector<T> out;
@@ -94,7 +95,7 @@ public:
 		}
 		return out;
 	    }
-	throw std::invalid_argument("No matching key '" + key + "' found.");
+        return {}; // not found
     };
 
     const std::string &getName() const {
@@ -129,17 +130,17 @@ static std::unique_ptr<Policy> makePolicy(const ConfigHunk &config) {
     
     std::unique_ptr<Policy> policy;
 
-    const auto &policy_name = config.getScalar<std::string>("policy");
+    const auto policy_name = config.getScalar<std::string>("policy");
 
     if (policy_name == "steps") {
-	const auto &ranks = config.getVector<int>("steps");
-	const auto &scales = config.getVector<float>("steps");
-	if (ranks.size() != scales.size())
+	const auto ranks = config.getVector<int>("steps");
+	const auto scales = config.getVector<float>("steps");
+	if (ranks->size() != scales->size())
 	    throw std::invalid_argument("Inconsistant policy configuration, scales count do not match steps count");
 
 	std::vector<StepsPolicy::Step> steps;
-	for (size_t i = 0; i < ranks.size(); i++) {
-	    steps.push_back(StepsPolicy::Step(ranks[i], scales[i]));
+	for (size_t i = 0; i < ranks->size(); i++) {
+	    steps.push_back(StepsPolicy::Step(ranks.value()[i], scales.value()[i]));
 	}
 	policy.reset(new StepsPolicy(steps));
 
@@ -154,7 +155,7 @@ static std::unique_ptr<Policy> makePolicy(const ConfigHunk &config) {
     } else if (policy_name == "random") {
 #endif
     } else {
-	throw std::invalid_argument("Unhandled policy type '" + policy_name + "'");
+	throw std::invalid_argument("Unhandled policy type '" + policy_name.value() + "'");
     }
 
     return policy;
@@ -166,20 +167,20 @@ static std::unique_ptr<Network> makeNetwork(const ConfigHunk &config) {
 
 
     std::unique_ptr<Network> net(new Network()); 
-    net->_batch             = config.getScalar<int>("batch");
-    net->_subdivisions      = config.getScalar<size_t>("subdivisions");
-    net->_input_size.width  = config.getScalar<size_t>("width");
-    net->_input_size.height = config.getScalar<size_t>("height");
-    net->_channels          = config.getScalar<size_t>("channels");
-    net->_momentum          = config.getScalar<float>("momentum");
-    net->_decay             = config.getScalar<float>("decay");
-    net->_angle             = config.getScalar<float>("angle");
-    net->_saturation        = config.getScalar<float>("saturation");
-    net->_exposure          = config.getScalar<float>("exposure");
-    net->_hue               = config.getScalar<float>("hue");
-    net->_learning_rate     = config.getScalar<float>("learning_rate");
-    net->_burn_in           = config.getScalar<size_t>("burn_in");
-    net->_max_batches       = config.getScalar<size_t>("max_batches");
+    net->_batch             = config.getScalar<int>("batch").value();
+    net->_subdivisions      = config.getScalar<size_t>("subdivisions").value();
+    net->_input_size.width  = config.getScalar<size_t>("width").value();
+    net->_input_size.height = config.getScalar<size_t>("height").value();
+    net->_channels          = config.getScalar<size_t>("channels").value();
+    net->_momentum          = config.getScalar<float>("momentum").value();
+    net->_decay             = config.getScalar<float>("decay").value();
+    net->_angle             = config.getScalar<float>("angle").value();
+    net->_saturation        = config.getScalar<float>("saturation").value();
+    net->_exposure          = config.getScalar<float>("exposure").value();
+    net->_hue               = config.getScalar<float>("hue").value();
+    net->_learning_rate     = config.getScalar<float>("learning_rate").value();
+    net->_burn_in           = config.getScalar<size_t>("burn_in").value();
+    net->_max_batches       = config.getScalar<size_t>("max_batches").value();
 
     net->setPolicy(makePolicy(config));
     return net;
@@ -189,23 +190,28 @@ static std::unique_ptr<Layer> makeLayer(const ConfigHunk &config) {
     std::string layer_name = config.getName().substr(1, config.getName().size() - 2); // remove [] around name
 
     if (layer_name == "convolutional") {
-	bool batch_normalize   = config.getScalar<bool>("batch_normalize");
-	size_t filters         = config.getScalar<size_t>("filters");
-	size_t size            = config.getScalar<size_t>("size");
-	size_t stride          = config.getScalar<size_t>("stride");
-	bool pad               = config.getScalar<bool>("pad");
+	bool batch_normalize   = config.getScalar<bool>("batch_normalize").value_or(false);
+	size_t filters         = config.getScalar<size_t>("filters").value();
+	size_t size            = config.getScalar<size_t>("size").value();
+	size_t stride          = config.getScalar<size_t>("stride").value();
+	bool pad               = config.getScalar<bool>("pad").value();
 	size_t padding         = pad ? size / 2 : 0;
-	Activation activation  = activationFromString(config.getScalar<std::string>("activation"));
+	Activation activation  = activationFromString(config.getScalar<std::string>("activation").value());
 
 	return std::unique_ptr<Layer>(new ConvolutionalLayer(batch_normalize, filters, size, stride, padding, activation));
     } else if (layer_name == "maxpool") {
-	size_t stride          = config.getScalar<size_t>("stride");
-	size_t size            = config.getScalar<size_t>("size");
-	size_t padding;
-	try { padding = config.getScalar<size_t>("padding"); }
-	catch (...) { padding = (size - 1) / 2; }
+	size_t stride          = config.getScalar<size_t>("stride").value();
+	size_t size            = config.getScalar<size_t>("size").value();
+	size_t padding = config.getScalar<size_t>("padding").value_or((size - 1) / 2);
 
 	return std::unique_ptr<Layer>(new MaxpoolLayer(size, stride, padding));
+    } else if (layer_name == "reorg") {
+	size_t stride = config.getScalar<size_t>("stride").value_or(1);
+        bool reverse  = config.getScalar<bool>("reverse").value_or(false);
+        bool flatten  = config.getScalar<bool>("flatten").value_or(false);
+        bool extra    = config.getScalar<bool>("extra").value_or(false);
+        return std::unique_ptr<Layer>(new ReorgLayer(stride, reverse, flatten, extra));
+
     } else if (layer_name == "route") {
         throw std::invalid_argument("Route are not standard layers, cannot be handled here.");
     } else {
@@ -228,7 +234,7 @@ std::unique_ptr<Network> NetworkFactory::createFromString(const std::string &con
     while (!local_copy.empty()) {
 	const auto &config = popConfigHunk(local_copy);
         if (isRouteConfig(config)) {
-            const auto &layers_idx = config.getVector<int>("layers");
+            const auto layers_idx = config.getVector<int>("layers").value();
             net->addRoute(layers_idx);
         } else
             net->addLayer(makeLayer(config));

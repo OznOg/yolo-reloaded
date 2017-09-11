@@ -5,7 +5,7 @@ project (yolo-reloaded)
 set (yolo-reloaded_VERSION_MAJOR 1)
 set (yolo-reloaded_VERSION_MINOR 0)
 
-set(CMAKE_CXX_FLAGS "-std=c++14 -Wall -Werror -Wextra")
+set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -Werror -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -ggdb")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 

@@ -189,4 +189,41 @@ private:
     std::vector<float>   _delta;
 };
 
+class ReorgLayer : public Layer {
+public:
+    ReorgLayer(size_t stride, bool reverse, bool flatten, bool extra) :
+        _stride(stride), _reverse(reverse), _flatten(flatten), _extra(extra) {}
+
+    void setInputFormat(const Size &s, size_t channels, size_t batch) override {
+        _input_size = s;
+        if (_reverse) {
+            setOutputSize(_input_size * _stride);
+            _channels = channels / (_stride * _stride);
+        } else {
+            setOutputSize(_input_size / _stride);
+            _channels = channels * (_stride * _stride);
+        }
+
+	size_t new_data_size = getOutputSize().width * getOutputSize().height * _channels;
+        if (_extra) {
+            setOutputSize(Size(0, 0));
+            _channels = 0;
+            new_data_size = s.width * s.height * channels + _extra;
+        }
+
+        new_data_size *= batch;
+        _output.resize(new_data_size);
+        _delta.resize(new_data_size);
+    }
+
+private:
+    std::vector<float>   _delta;
+    Size   _input_size;
+    size_t _channels;
+    size_t _stride;
+    bool _reverse;
+    bool _flatten;
+    bool _extra;
+};
+
 }
