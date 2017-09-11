@@ -115,6 +115,20 @@ public:
 	_policy = std::move(policy);
     }
 
+    void addRoute(const std::vector<int> &layers_idx) {
+        std::vector<Layer *> route_layers; // FIXME use weak_ptr
+        for (const auto &idx : layers_idx) {
+            Layer *l;
+            if (idx >= 0) {
+                l =_layers[idx].get();
+            } else { // negative indexes reference layers starting from back
+                l =_layers[_layers.size() + idx].get();
+            }
+            route_layers.push_back(l);
+        }
+        addLayer(std::make_unique<RouteLayer>(route_layers));
+    }
+
     void addLayer(std::unique_ptr<Layer> layer) {
 	/* For the first layer we give the network input size; for next ones,
 	 * each layer N gets the output size of the layer N - 1 */

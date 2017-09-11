@@ -16,10 +16,16 @@ public:
 	return _output_size;
     }
 
+    auto &getOutput() {
+        return _output;
+    }
+
 protected:
     void setOutputSize(const Size &s) {
 	_output_size = s;
     }
+
+    std::vector<float>   _output; // FIXME make private
 
 private:
     Size _output_size;
@@ -160,6 +166,27 @@ private:
     std::vector<float>  _output;
     std::vector<float>  _delta;
 
+};
+
+class RouteLayer : public Layer {
+public:
+    RouteLayer(std::vector<Layer *> input_layers) :
+        _input_layers(input_layers) {
+            size_t outputs = 0;
+            for (const auto &layer : input_layers){
+                outputs += layer->getOutput().size();
+            }
+            _delta.resize(outputs);
+            _output.resize(outputs);;
+        }
+
+    void setInputFormat(const Size &, size_t, size_t) override {
+        // FIXME having this empty really enforce the fact that route is not a layer...
+        // need more investigation in order to rework that properly
+    }
+private:
+    std::vector<Layer *> _input_layers;
+    std::vector<float>   _delta;
 };
 
 }

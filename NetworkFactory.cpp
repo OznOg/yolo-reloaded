@@ -206,10 +206,16 @@ static std::unique_ptr<Layer> makeLayer(const ConfigHunk &config) {
 	catch (...) { padding = (size - 1) / 2; }
 
 	return std::unique_ptr<Layer>(new MaxpoolLayer(size, stride, padding));
+    } else if (layer_name == "route") {
+        throw std::invalid_argument("Route are not standard layers, cannot be handled here.");
     } else {
 	throw std::invalid_argument("Unhandled layer type '" + layer_name + "'");
     }
     return {};
+}
+
+static inline bool isRouteConfig(const ConfigHunk &config) {
+    return config.getName() == "[route]";
 }
 
 std::unique_ptr<Network> NetworkFactory::createFromString(const std::string &content) {
@@ -220,8 +226,12 @@ std::unique_ptr<Network> NetworkFactory::createFromString(const std::string &con
     auto net = makeNetwork(networkConfig);
 
     while (!local_copy.empty()) {
-	const auto &layerConfig = popConfigHunk(local_copy);
-	net->addLayer(makeLayer(layerConfig));
+	const auto &config = popConfigHunk(local_copy);
+        if (isRouteConfig(config)) {
+            const auto &layers_idx = config.getVector<int>("layers");
+            net->addRoute(layers_idx);
+        } else
+            net->addLayer(makeLayer(config));
     }
  
     return net;
