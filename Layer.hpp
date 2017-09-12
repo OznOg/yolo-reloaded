@@ -226,4 +226,34 @@ private:
     bool _extra;
 };
 
+class RegionLayer : public Layer {
+public:
+    RegionLayer(int num, int classes, int coords, const std::vector<float> &biases) :
+        _num(num), _classes(classes), _coords(coords), _biases(biases.begin(), biases.end()) {}
+
+    void setInputFormat(const Size &s, size_t channels, size_t batch) override {
+        _input_size = s;;
+        _filters = channels * (_classes + _coords + 1);
+        _channels = channels;
+        setOutputSize(_input_size);
+
+        _biases.resize(channels * 2, .5);
+        _bias_updates.resize(channels * 2);
+        _output.resize(getOutputSize().width * getOutputSize().height * channels * (_classes + _coords + 1) * batch);
+        _delta.resize(_output.size());
+    }
+private:
+    Size   _input_size;
+    size_t _filters;
+    size_t _channels;
+    int _num;
+    int _classes;
+    int _coords;
+
+    std::vector<float> _biases;
+    std::vector<float> _bias_updates;
+    std::vector<float> _delta;
+    std::vector<float>  _output;
+};
+
 }

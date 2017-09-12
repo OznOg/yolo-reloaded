@@ -205,6 +205,43 @@ static std::unique_ptr<Layer> makeLayer(const ConfigHunk &config) {
 	size_t padding = config.getScalar<size_t>("padding").value_or((size - 1) / 2);
 
 	return std::unique_ptr<Layer>(new MaxpoolLayer(size, stride, padding));
+    } else if (layer_name == "region") {
+        int coords = config.getScalar<int>("coords").value_or(4);
+        int classes = config.getScalar<int>("classes").value_or(20);
+        int num = config.getScalar<int>("num").value_or(1);
+        auto biases = config.getVector<float>("anchors").value_or(std::vector<float>());
+
+        auto layer = new RegionLayer(num, classes, coords, biases);
+
+#if 0
+        //FIXME not used yet...
+        auto log = config.getScalar<int>("log").value_or(0);
+        auto sqrt = config.getScalar<int>("sqrt").value_or(0);
+
+        auto softmax = config.getScalar<int>("softmax").value_or(0);
+        auto background = config.getScalar<int>("background").value_or(0);
+        auto max_boxes = config.getScalar<int>("max").value_or(30);
+        auto jitter = config.getScalar<float>("jitter").value_or(.2);
+        auto rescore = config.getScalar<int>("rescore").value_or(0);
+
+        auto thresh = config.getScalar<float>("thresh").value_or(.5);
+        auto classfix = config.getScalar<int>("classfix").value_or(0);
+        auto absolute = config.getScalar<int>("absolute").value_or(0);
+        auto random = config.getScalar<int>("random").value_or(0);
+
+        auto coord_scale = config.getScalar<float>("coord_scale").value_or(1);
+        auto object_scale = config.getScalar<float>("object_scale").value_or(1);
+        auto noobject_scale = config.getScalar<float>("noobject_scale").value_or(1);
+        auto mask_scale = config.getScalar<float>("mask_scale").value_or(1);
+        auto class_scale = config.getScalar<float>("class_scale").value_or(1);
+        auto bias_match = config.getScalar<int>("bias_match").value_or(0);
+
+        auto tree_file = config.getScalar<std::string>("tree").value_or(nullptr);
+#endif
+
+        // FIXME tree parsing not handled (yet)
+        return std::unique_ptr<Layer>(layer);
+
     } else if (layer_name == "reorg") {
 	size_t stride = config.getScalar<size_t>("stride").value_or(1);
         bool reverse  = config.getScalar<bool>("reverse").value_or(false);
