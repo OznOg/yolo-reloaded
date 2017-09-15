@@ -133,7 +133,14 @@ public:
 	/* For the first layer we give the network input size; for next ones,
 	 * each layer N gets the output size of the layer N - 1 */
 	const auto &size = _layers.empty() ? _input_size : _layers.back()->getOutputSize();
-	layer->setInputFormat(size, _channels, _batch);
+	auto &channels = _layers.empty() ? _channels : _layers.back()->getOutputChannels();
+	layer->setInputFormat(size, channels, _batch);
+
+	std::cout << std::setw(4) << _layers.size() << std::setw(15) << layer->getName()
+                  << std::setw(4) << size.width << " x " << std::setw(4) << size.height << " x " << std::setw(4) << channels
+                  << "   ->  " 
+                  << std::setw(4) << layer->getOutputSize().width << " x " << std::setw(4) <<  layer->getOutputSize().height << " x " << std::setw(4)
+                  << layer->getOutputChannels() << std::endl;
 	_layers.push_back(std::move(layer));
     }
 

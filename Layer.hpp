@@ -4,6 +4,8 @@
 
 #include <string>
 #include <vector>
+#include <iostream>
+#include <iomanip>
 
 namespace yolo {
 
@@ -15,23 +17,36 @@ public:
 
     virtual ~Layer() {}
 
-    const Size &getOutputSize() {
+    const Size &getOutputSize() const {
 	return _output_size;
     }
 
+    const auto &getOutput() const {
+        return _output;
+    }
+
+    const auto &getOutputChannels() const {
+	return _channels;
+    }
+
+protected:
     auto &getOutput() {
         return _output;
     }
 
-protected:
     void setOutputSize(const Size &s) {
 	_output_size = s;
+    }
+
+    void setOutputChannels(const size_t &channels) {
+	_channels = channels;
     }
 
     std::vector<float>   _output; // FIXME make private
 
 private:
     Size _output_size;
+    size_t _channels;
 };
 
 
@@ -74,7 +89,7 @@ public:
     ConvolutionalLayer(bool batch_normalize, size_t filters,
                        size_t size, size_t stride, size_t padding, Activation activation) :
          _batch_normalize(batch_normalize), _filters(filters), _size(size), 
-	 _stride(stride), _padding(padding), _activation(activation), _weights(), _biases(filters), _bias_updates(filters) {}
+	 _stride(stride), _padding(padding), _activation(activation), _weights(), _biases(filters), _bias_updates(filters) { setOutputChannels(filters); }
 
     void setInputFormat(const Size &s, size_t channels, size_t batch) override {
 	_input_size = s;
@@ -181,10 +196,10 @@ private:
 
 class RouteLayer : public Layer {
 public:
-    RouteLayer(std::vector<Layer *> input_layers) :
+    RouteLayer(const std::vector<Layer *> input_layers) :
         _input_layers(input_layers) {
             size_t outputs = 0;
-            for (const auto &layer : input_layers){
+            for (const auto *layer : input_layers){
                 outputs += layer->getOutput().size();
             }
             _delta.resize(outputs);
@@ -278,7 +293,6 @@ private:
     std::vector<float> _biases;
     std::vector<float> _bias_updates;
     std::vector<float> _delta;
-    std::vector<float>  _output;
 };
 
 }
