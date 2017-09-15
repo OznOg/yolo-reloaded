@@ -171,6 +171,8 @@ public:
 	_channels = channels;
 	setOutputSize((_input_size + 2 * _padding) / _stride);
 
+        setOutputChannels(channels);
+
 	size_t new_data_size = getOutputSize().width * getOutputSize().height * channels * batch;
 	_indexes.resize(new_data_size);
 	_output.resize(new_data_size);
@@ -204,6 +206,26 @@ public:
             }
             _delta.resize(outputs);
             _output.resize(outputs);;
+
+
+	    auto &first = *input_layers[0];
+	    Size outputSize = first.getOutputSize();
+	    size_t outChannels = first.getOutputChannels();
+
+            for (const auto *next : input_layers) {
+                if (&first == next)
+                    continue; // skip first one as it was used for init
+
+		if(next->getOutputSize() == first.getOutputSize()) {
+		    outChannels += next->getOutputChannels();
+		} else {
+		    outputSize = Size(0, 0);
+		    outChannels = 0;
+		}
+	    }
+	    setOutputSize(outputSize);
+	    setOutputChannels(outChannels);
+
         }
 
     void setInputFormat(const Size &, size_t, size_t) override {
@@ -227,24 +249,26 @@ public:
 
     void setInputFormat(const Size &s, size_t channels, size_t batch) override {
         _input_size = s;
+        size_t output_channels;
         if (_reverse) {
             setOutputSize(_input_size * _stride);
-            _channels = channels / (_stride * _stride);
+            output_channels = channels / (_stride * _stride);
         } else {
             setOutputSize(_input_size / _stride);
-            _channels = channels * (_stride * _stride);
+            output_channels = channels * (_stride * _stride);
         }
 
-	size_t new_data_size = getOutputSize().width * getOutputSize().height * _channels;
+	size_t new_data_size = getOutputSize().width * getOutputSize().height * output_channels;
         if (_extra) {
             setOutputSize(Size(0, 0));
-            _channels = 0;
+            output_channels = 0;
             new_data_size = s.width * s.height * channels + _extra;
         }
 
         new_data_size *= batch;
         _output.resize(new_data_size);
         _delta.resize(new_data_size);
+        setOutputChannels(output_channels);
     }
 
     std::string getName() const override {
@@ -254,7 +278,6 @@ public:
 private:
     std::vector<float>   _delta;
     Size   _input_size;
-    size_t _channels;
     size_t _stride;
     bool _reverse;
     bool _flatten;
@@ -269,8 +292,8 @@ public:
     void setInputFormat(const Size &s, size_t channels, size_t batch) override {
         _input_size = s;;
         _filters = channels * (_classes + _coords + 1);
-        _channels = channels;
         setOutputSize(_input_size);
+        setOutputChannels(channels);
 
         _biases.resize(channels * 2, .5);
         _bias_updates.resize(channels * 2);
@@ -285,7 +308,6 @@ public:
 private:
     Size   _input_size;
     size_t _filters;
-    size_t _channels;
     int _num;
     int _classes;
     int _coords;
