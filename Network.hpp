@@ -2,6 +2,7 @@
 
 #include <Layer.hpp>
 
+#include <fstream>
 #include <memory>
 #include <cmath>
 #include <random>
@@ -144,9 +145,28 @@ public:
 	_layers.push_back(std::move(layer));
     }
 
+    void loadWeights(std::istream &in) {
+        int major, minor, revision;
+        in.read((char *)&major, sizeof(major))
+          .read((char *)&minor, sizeof(minor))
+          .read((char *)&revision, sizeof(revision));
+
+        if ((major * 10 + minor) >= 2) {
+            in.read((char *)_seen, sizeof(_seen));
+        } else {
+            int iseen = 0;
+            in.read((char *)&iseen, sizeof(iseen));
+            _seen = iseen;
+        }
+
+        for (auto &layer : _layers) {
+            layer->loadWeights(in);
+        }
+    }
 private:
     std::vector<std::unique_ptr<Layer>> _layers;
     std::unique_ptr<Policy> _policy;
+    size_t _seen;
 };
 
 }

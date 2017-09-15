@@ -13,7 +13,13 @@ bool run_detect(const std::vector<std::string> &args) {
         return false;
     }
 
-    NetworkFactory().createFromFile(args[0]);
+    auto net = NetworkFactory().createFromFile(args[0]);
+
+    auto weightsFile = std::ifstream(args[1]);
+
+    if (!weightsFile)
+        return false;
+    net->loadWeights(weightsFile);
 
     return true;
 }

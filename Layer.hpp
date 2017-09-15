@@ -6,6 +6,7 @@
 #include <vector>
 #include <iostream>
 #include <iomanip>
+#include <iterator>
 
 namespace yolo {
 
@@ -28,6 +29,8 @@ public:
     const auto &getOutputChannels() const {
 	return _channels;
     }
+
+    virtual void loadWeights(std::istream &in) = 0;
 
 protected:
     auto &getOutput() {
@@ -126,6 +129,17 @@ public:
         return "Convolutional";
     }
 
+    void loadWeights(std::istream &in) override {
+        in.read((char *)&_biases[0], _biases.size() * sizeof(float));
+
+        if (_batch_normalize /* FIXME not used yet && (!l.dontloadscales) */ ) {
+            in.read((char *)&_scales[0], _scales.size() * sizeof(float))
+              .read((char *)&_rolling_mean[0], _rolling_mean.size() * sizeof(float))
+              .read((char *)&_rolling_variance[0], _rolling_variance.size() * sizeof(float));
+        }
+        in.read((char *)&_weights[0], _weights.size() * sizeof(float));
+    }
+
 private:
     Size   _input_size;
     bool   _batch_normalize = false;
@@ -183,6 +197,9 @@ public:
         return "Maxpool";
     }
 
+    void loadWeights(std::istream &in) override {
+        (void)in;
+    }
 private:
     Size   _input_size;
     size_t _channels;
@@ -237,6 +254,9 @@ public:
         return "Route";
     }
 
+    void loadWeights(std::istream &in) override {
+        (void)in;
+    }
 private:
     std::vector<Layer *> _input_layers;
     std::vector<float>   _delta;
@@ -275,6 +295,9 @@ public:
         return "Reorg";
     }
 
+    void loadWeights(std::istream &in) override {
+        (void)in;
+    }
 private:
     std::vector<float>   _delta;
     Size   _input_size;
@@ -305,6 +328,9 @@ public:
         return "Detection";
     }
 
+    void loadWeights(std::istream &in) override {
+        (void)in;
+    }
 private:
     Size   _input_size;
     size_t _filters;
