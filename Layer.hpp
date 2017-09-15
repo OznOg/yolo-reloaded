@@ -10,6 +10,9 @@ namespace yolo {
 class Layer {
 public:
     virtual void setInputFormat(const Size &s, size_t channels, size_t batch) = 0;
+
+    virtual std::string getName() const = 0;
+
     virtual ~Layer() {}
 
     const Size &getOutputSize() {
@@ -104,6 +107,10 @@ public:
 	}
     }
 
+    std::string getName() const override {
+        return "Convolutional";
+    }
+
 private:
     Size   _input_size;
     bool   _batch_normalize = false;
@@ -155,6 +162,10 @@ public:
 	_delta.resize(new_data_size);
     }
 
+    std::string getName() const override {
+        return "Maxpool";
+    }
+
 private:
     Size   _input_size;
     size_t _channels;
@@ -184,6 +195,11 @@ public:
         // FIXME having this empty really enforce the fact that route is not a layer...
         // need more investigation in order to rework that properly
     }
+
+    std::string getName() const override {
+        return "Route";
+    }
+
 private:
     std::vector<Layer *> _input_layers;
     std::vector<float>   _delta;
@@ -216,6 +232,10 @@ public:
         _delta.resize(new_data_size);
     }
 
+    std::string getName() const override {
+        return "Reorg";
+    }
+
 private:
     std::vector<float>   _delta;
     Size   _input_size;
@@ -242,6 +262,11 @@ public:
         _output.resize(getOutputSize().width * getOutputSize().height * channels * (_classes + _coords + 1) * batch);
         _delta.resize(_output.size());
     }
+
+    std::string getName() const override {
+        return "Detection";
+    }
+
 private:
     Size   _input_size;
     size_t _filters;
