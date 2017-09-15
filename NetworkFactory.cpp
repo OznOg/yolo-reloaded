@@ -132,7 +132,7 @@ static std::unique_ptr<Policy> makePolicy(const ConfigHunk &config) {
 
     const auto policy_name = config.getScalar<std::string>("policy");
 
-    if (policy_name == "steps") {
+    if (policy_name.value() == "steps") {
 	const auto ranks = config.getVector<int>("steps");
 	const auto scales = config.getVector<float>("steps");
 	if (ranks->size() != scales->size())
