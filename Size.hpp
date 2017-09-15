@@ -27,6 +27,14 @@ struct Size {
    Size operator/(size_t v) {
        return Size(height / v, width / v);
    }
+
+   bool operator!=(const Size &anotherSize) const {
+       return !operator==(anotherSize);
+   }
+
+   bool operator==(const Size &anotherSize) const {
+       return height == anotherSize.height && width == anotherSize.width;
+   }
 };
 
 } // namespace yolo
