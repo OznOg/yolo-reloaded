@@ -55,8 +55,31 @@ bool run_detect(const std::vector<std::string> &args) {
 
     cv::Mat floatInput;
     letterbox.convertTo(floatInput, CV_32F);
+    normalize(floatInput, floatInput, 0, 1, cv::NORM_MINMAX, CV_32F);
 
-    return true;
+
+    // FIXME the predict function expects channels to be separated (full image
+    // R, full image G, full image B) but openCV stores the image with channels
+    // interleaved.
+    // Code next copies each channels in an array... quite under optimal, but I
+    // need to go deeper in prediction algo to see if it would be possible to
+    // pass to openCV Mat as is.
+    cv::Mat bgr[3];
+    cv::split(floatInput,bgr);
+
+    std::vector<float> array;
+    for (size_t channel = 0; channel < 3; channel++) {
+        cv::Mat &mat = bgr[channel];
+        if (mat.isContinuous()) {
+            array.insert(array.end(), (float*)mat.datastart, (float*)mat.dataend);
+        } else {
+            for (int i = 0; i < mat.rows; ++i) {
+                array.insert(array.end(), mat.ptr<float>(i), mat.ptr<float>(i)+mat.cols);
+            }
+        }
+    }
+
+    return net->predict(array);
 }
 
 

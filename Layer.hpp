@@ -32,6 +32,9 @@ public:
 
     virtual void loadWeights(std::istream &in) = 0;
 
+    virtual void forward(const std::vector<float> &) {
+        throw std::invalid_argument("Forward not implemented for layer " + getName());
+    }
 protected:
     auto &getOutput() {
         return _output;

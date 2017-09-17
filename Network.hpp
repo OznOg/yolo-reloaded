@@ -163,6 +163,14 @@ public:
             layer->loadWeights(in);
         }
     }
+
+    bool predict(const std::vector<float> &input) {
+        for (auto &layer : _layers) {
+            layer->forward(input);
+        }
+        return true;
+    }
+
 private:
     std::vector<std::unique_ptr<Layer>> _layers;
     std::unique_ptr<Policy> _policy;
