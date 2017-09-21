@@ -7,6 +7,7 @@
 #include <iostream>
 #include <iomanip>
 #include <iterator>
+#include <opencv2/opencv.hpp>
 
 namespace yolo {
 
@@ -99,7 +100,8 @@ public:
 
     void setInputFormat(const Size &s, size_t channels, size_t batch) override {
 	_input_size = s;
-	_weights.resize(channels * _filters * _size * _size);
+        _input_channels = channels;
+	_weights.resize(_input_channels * _filters * _size * _size);
 	_weights_updates.resize(_weights.size());
 
 	setOutputSize((_input_size + 2 * _padding - _size) / _stride + 1);
@@ -108,7 +110,7 @@ public:
 
 	_delta.resize(_output.size());
 
-        _workspace_size = getOutputSize().width * getOutputSize().height * channels * _size * _size * sizeof(float);
+        _workspace_size = getOutputSize().width * getOutputSize().height * _input_channels * _size * _size * sizeof(float);
 
 	if (_batch_normalize) {
 	    _scales.resize(_filters, 1.);
@@ -143,8 +145,72 @@ public:
         in.read((char *)&_weights[0], _weights.size() * sizeof(float));
     }
 
+    float im2col_get_pixel(const std::vector<float> &im, int height, int width, int /*channels*/,
+            int row, int col, int channel, int pad)
+    {
+        row -= pad;
+        col -= pad;
+
+        if (row < 0 || col < 0 || row >= height || col >= width)
+            return 0; // missing pixels are extrapolated by black pixels
+
+        return im[col + width * (row + height * channel)];
+    }
+
+    //From Berkeley Vision's Caffe!
+    //https://github.com/BVLC/caffe/blob/master/LICENSE
+    void im2col_cpu(const std::vector<float> &data_im,
+            int channels,  int height,  int width,
+            int ksize,  int stride, int pad, float *data_col)
+    {
+        int height_col = (height + 2*pad - ksize) / stride + 1;
+        int width_col =  (width  + 2*pad - ksize) / stride + 1;
+
+        int channels_col = channels * ksize * ksize;
+
+        for (int c = 0; c < channels_col; ++c) {
+
+            int w_offset = c % ksize;
+
+            int h_offset = (c / ksize) % ksize;
+
+            int c_im = c / ksize / ksize;
+
+            for (int h = 0; h < height_col; ++h) {
+                for (int w = 0; w < width_col; ++w) {
+
+                    int im_row = h_offset + h * stride;
+                    int im_col = w_offset + w * stride;
+
+                    int col_index = (c * height_col + h) * width_col + w;
+
+                    data_col[col_index] = im2col_get_pixel(data_im, height, width, channels,
+                            im_row, im_col, c_im, pad);
+                }
+            }
+        }
+    }
+
+    virtual void forward(const std::vector<float> &input) {
+        //_output.assign(1, _output.size()); //FIXME seems useless
+        //Mat (int rows, int cols, int type)
+
+        cv::Mat weights(_filters,_input_channels * _size * _size, CV_32FC1);
+        memcpy(weights.data, &_weights[0], _weights.size() * sizeof(float));
+
+        cv::Mat temp(_input_channels * _size * _size, getOutputSize().width * getOutputSize().height, CV_32FC1);
+
+        im2col_cpu(input, _input_channels, getOutputSize().height, getOutputSize().width, _size, _stride, _padding, (float *)temp.data);
+
+        cv::Mat output = weights * temp;
+        // FIXME handle multi batch is not implemented
+        // FIXME need to make my mind on using Mat or not, prevent copying every now and then
+
+        memcpy(&_output[0], output.data, _filters * getOutputSize().width * getOutputSize().height * sizeof(float));
+    }
 private:
     Size   _input_size;
+    size_t _input_channels;
     bool   _batch_normalize = false;
     size_t _filters = 1;
     size_t _size = 1;
