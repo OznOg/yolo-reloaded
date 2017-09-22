@@ -29,34 +29,35 @@ bool run_detect(const std::vector<std::string> &args) {
     // net->set_batch_network(1);
 
     std::string file_name = args[2];
-    cv::Mat image = cv::imread(file_name);
-    if (image.empty()) {
+    cv::Mat imageInteger = cv::imread(file_name);
+    if (imageInteger.empty()) {
         std::cerr << "Could not load image '" << file_name << "'\n";
         return false;
     }
 
+    cv::Mat imageFloat(imageInteger.size(), CV_32F);
+
+    imageInteger.convertTo(imageFloat, CV_32F);
+
+    imageFloat /= 255.;
+
     cv::Mat resized;
-    double resize_factor_x = ((double)net->_input_size.width) / image.cols;
-    double resize_factor_y = ((double)net->_input_size.height) / image.rows;
+    double resize_factor_x = ((double)net->_input_size.width) / imageFloat.cols;
+    double resize_factor_y = ((double)net->_input_size.height) / imageFloat.rows;
 
     auto min = std::min(resize_factor_x, resize_factor_y);
 
     // resize image (keeping ratio) so that it fits the network input
-    cv::resize(image, resized, cv::Size(0, 0), min, min);
+    cv::resize(imageFloat, resized, cv::Size(0, 0), min, min);
 
-    cv::Mat letterbox(cv::Size(net->_input_size.width, net->_input_size.height), image.type());
+    cv::Mat letterbox(cv::Size(net->_input_size.width, net->_input_size.height), resized.type());
     size_t distance_to_top  = (letterbox.rows - resized.rows) / 2;
     size_t distance_to_side = (letterbox.cols - resized.cols) / 2;
 
     // resized image is copied into a network expected size, adding grey borders
     copyMakeBorder(resized, letterbox, distance_to_top, distance_to_top,
                    distance_to_side, distance_to_side,
-                   cv::BORDER_CONSTANT, cv::Scalar(0x7F, 0x7F, 0x7F));
-
-    cv::Mat floatInput;
-    letterbox.convertTo(floatInput, CV_32F);
-    normalize(floatInput, floatInput, 0, 1, cv::NORM_MINMAX, CV_32F);
-
+                   cv::BORDER_CONSTANT, cv::Scalar(0.5, 0.5, 0.5));
 
     // FIXME the predict function expects channels to be separated (full image
     // R, full image G, full image B) but openCV stores the image with channels
@@ -65,10 +66,10 @@ bool run_detect(const std::vector<std::string> &args) {
     // need to go deeper in prediction algo to see if it would be possible to
     // pass to openCV Mat as is.
     cv::Mat bgr[3];
-    cv::split(floatInput,bgr);
+    cv::split(letterbox,bgr);
 
     std::vector<float> array;
-    for (size_t channel = 0; channel < 3; channel++) {
+    for (ssize_t channel = 2; channel >=0; channel--) {
         cv::Mat &mat = bgr[channel];
         if (mat.isContinuous()) {
             array.insert(array.end(), (float*)mat.datastart, (float*)mat.dataend);
