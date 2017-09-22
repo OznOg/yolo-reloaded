@@ -192,7 +192,7 @@ public:
     }
 
     virtual void forward(const std::vector<float> &input) {
-        //_output.assign(1, _output.size()); //FIXME seems useless
+        _output.assign(1, _output.size()); //FIXME seems useless
         //Mat (int rows, int cols, int type)
 
         cv::Mat weights(_filters,_input_channels * _size * _size, CV_32FC1);
@@ -200,7 +200,7 @@ public:
 
         cv::Mat temp(_input_channels * _size * _size, getOutputSize().width * getOutputSize().height, CV_32FC1);
 
-        im2col_cpu(input, _input_channels, getOutputSize().height, getOutputSize().width, _size, _stride, _padding, (float *)temp.data);
+        im2col_cpu(input, _input_channels, _input_size.height, _input_size.width, _size, _stride, _padding, (float *)temp.data);
 
         cv::Mat output = weights * temp;
         // FIXME handle multi batch is not implemented
