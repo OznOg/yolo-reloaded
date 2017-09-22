@@ -13,6 +13,6 @@ find_package(OpenCV REQUIRED)
 
 include_directories(.)
 
-add_executable(darknet darknet.cpp NetworkFactory.cpp)
+add_executable(darknet darknet.cpp NetworkFactory.cpp gemm.c blas.c)
 target_link_libraries(darknet ${OpenCV_LIBS})
 

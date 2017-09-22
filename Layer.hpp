@@ -7,7 +7,11 @@
 #include <iostream>
 #include <iomanip>
 #include <iterator>
-#include <opencv2/opencv.hpp>
+
+extern "C" {
+#include "gemm.h"
+#include "blas.h"
+}
 
 namespace yolo {
 
@@ -110,8 +114,6 @@ public:
 
 	_delta.resize(_output.size());
 
-        _workspace_size = getOutputSize().width * getOutputSize().height * _input_channels * _size * _size * sizeof(float);
-
 	if (_batch_normalize) {
 	    _scales.resize(_filters, 1.);
 	    _scale_updates.resize(_filters);
@@ -161,7 +163,7 @@ public:
     //https://github.com/BVLC/caffe/blob/master/LICENSE
     void im2col_cpu(const std::vector<float> &data_im,
             int channels,  int height,  int width,
-            int ksize,  int stride, int pad, float *data_col)
+            int ksize,  int stride, int pad, std::vector<float> &data_col)
     {
         int height_col = (height + 2*pad - ksize) / stride + 1;
         int width_col =  (width  + 2*pad - ksize) / stride + 1;
@@ -191,22 +193,54 @@ public:
         }
     }
 
+    void add_bias(float *output, const float *biases, int batch, int n, int size)
+    {       
+        int i,j,b;
+        for(b = 0; b < batch; ++b){
+            for(i = 0; i < n; ++i){
+                for(j = 0; j < size; ++j){ 
+                    output[(b*n + i)*size + j] += biases[i];
+                }
+            }   
+        }   
+    }       
+
+    void scale_bias(float *output, const float *scales, int batch, int n, int size)
+    {   
+        int i,j,b;
+        for(b = 0; b < batch; ++b){
+            for(i = 0; i < n; ++i){
+                for(j = 0; j < size; ++j){
+                    output[(b*n + i)*size + j] *= scales[i];
+                }
+            }
+        }   
+    }       
+
     virtual void forward(const std::vector<float> &input) {
         _output.assign(1, _output.size()); //FIXME seems useless
-        //Mat (int rows, int cols, int type)
 
-        cv::Mat weights(_filters,_input_channels * _size * _size, CV_32FC1);
-        memcpy(weights.data, &_weights[0], _weights.size() * sizeof(float));
+        std::vector<float> temp(getOutputSize().width * getOutputSize().height * (_input_channels * _size * _size /* ksize */));
 
-        cv::Mat temp(_input_channels * _size * _size, getOutputSize().width * getOutputSize().height, CV_32FC1);
+        im2col_cpu(input, _input_channels, _input_size.height, _input_size.width, _size, _stride, _padding, temp);
 
-        im2col_cpu(input, _input_channels, _input_size.height, _input_size.width, _size, _stride, _padding, (float *)temp.data);
+        int m = _filters;
+        int k = _input_channels * _size * _size;
+        int n = getOutputSize().width * getOutputSize().height;
 
-        cv::Mat output = weights * temp;
-        // FIXME handle multi batch is not implemented
-        // FIXME need to make my mind on using Mat or not, prevent copying every now and then
 
-        memcpy(&_output[0], output.data, _filters * getOutputSize().width * getOutputSize().height * sizeof(float));
+        float *a = &_weights[0];
+        float *b = &temp[0];
+        float *c = &_output[0];
+
+        gemm(0, 0, m, n, k, 1, a, k, b, n, 1, c, n);
+
+        if (_batch_normalize) {
+            _x = _output;
+            normalize_cpu(c, &_rolling_mean[0], &_rolling_variance[0], _batch, _filters, n);
+            scale_bias(c, &_scales[0], _batch, _filters, n);
+        }
+        add_bias(c, &_biases[0], _batch, _filters, n);
     }
 private:
     Size   _input_size;
@@ -216,8 +250,8 @@ private:
     size_t _size = 1;
     size_t _stride = 1;
     size_t _padding;
+    size_t _batch = 1;
     Activation _activation = Activation::Leaky;
-    size_t _workspace_size; // FIXME what is this used for?
 
     std::vector<float> _weights;
     std::vector<float> _weights_updates;
