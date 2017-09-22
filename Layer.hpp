@@ -225,7 +225,6 @@ private:
     std::vector<float> _biases;
     std::vector<float> _bias_updates;
 
-    std::vector<float> _output;
     std::vector<float> _delta;
 
 
@@ -277,7 +276,6 @@ private:
     size_t _padding;
 
     std::vector<size_t> _indexes;
-    std::vector<float>  _output;
     std::vector<float>  _delta;
 
 };
