@@ -164,9 +164,10 @@ public:
         }
     }
 
-    bool predict(const std::vector<float> &input) {
+    bool predict(const std::vector<float> &_input) {
+        auto *input = &_input;
         for (auto &layer : _layers) {
-            layer->forward(input);
+            input = &layer->forward(*input);
         }
         return true;
     }

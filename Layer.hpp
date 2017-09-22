@@ -37,7 +37,7 @@ public:
 
     virtual void loadWeights(std::istream &in) = 0;
 
-    virtual void forward(const std::vector<float> &) {
+    virtual const std::vector<float> &forward(const std::vector<float> &) {
         throw std::invalid_argument("Forward not implemented for layer " + getName());
     }
 protected:
@@ -217,7 +217,7 @@ public:
         }   
     }       
 
-    virtual void forward(const std::vector<float> &input) {
+    const std::vector<float> &forward(const std::vector<float> &input) override {
         _output.assign(1, _output.size()); //FIXME seems useless
 
         std::vector<float> temp(getOutputSize().width * getOutputSize().height * (_input_channels * _size * _size /* ksize */));
@@ -241,6 +241,8 @@ public:
             scale_bias(c, &_scales[0], _batch, _filters, n);
         }
         add_bias(c, &_biases[0], _batch, _filters, n);
+
+        return _output;
     }
 private:
     Size   _input_size;
@@ -284,7 +286,6 @@ public:
 
     void setInputFormat(const Size &s, size_t channels, size_t batch) override {
 	_input_size = s;
-	_channels = channels;
 	setOutputSize((_input_size + 2 * _padding) / _stride);
 
         setOutputChannels(channels);
@@ -302,12 +303,48 @@ public:
     void loadWeights(std::istream &in) override {
         (void)in;
     }
+
+    const std::vector<float> &forward(const std::vector<float> &input) override {
+        int w_offset = -_padding;
+        int h_offset = -_padding;
+
+        ssize_t h = getOutputSize().height;
+        ssize_t w = getOutputSize().width;
+        const auto &c = getOutputChannels();
+
+        for (size_t b = 0; b < _batch; ++b) {
+            for (size_t k = 0; k < c; ++k) {
+                for (ssize_t i = 0; i < h; ++i) {
+                    for (ssize_t j = 0; j < w; ++j) {
+                        int out_index = j + w*(i + h*(k + c*b));
+                        float max = std::numeric_limits<float>::lowest();
+                        int max_i = -1;
+                        for (size_t n = 0; n < _size; ++n) {
+                            for (size_t m = 0; m < _size; ++m) {
+                                ssize_t cur_h = h_offset + i*_stride + n;
+                                ssize_t cur_w = w_offset + j*_stride + m;
+                                int index = cur_w + w*(cur_h + h*(k + b* c));
+                                bool valid = (cur_h >= 0 && cur_h < h && cur_w >= 0 && cur_w < w);
+                                float val = valid ? input[index] : std::numeric_limits<float>::lowest();
+                                max_i = (val > max) ? index : max_i;
+                                max   = std::max(val, max);
+                            }
+                        }
+                        _output[out_index] = max;
+                        _indexes[out_index] = max_i;
+                    }
+                }
+            }
+        }
+
+        return _output;
+    }
 private:
     Size   _input_size;
-    size_t _channels;
     size_t _size;
     size_t _stride;
     size_t _padding;
+    size_t _batch = 1;
 
     std::vector<size_t> _indexes;
     std::vector<float>  _delta;
