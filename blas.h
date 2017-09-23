@@ -1,6 +1,6 @@
 #pragma once
 
-void reorg_cpu(float *x, int w, int h, int c, int batch, int stride, int forward, float *out);
+void reorg_cpu(const float *x, int w, int h, int c, int batch, int stride, int forward, float *out);
 void flatten(float *x, int size, int layers, int batch, int forward);
 void weighted_sum_cpu(float *a, float *b, float *s, int n, float *c);
 void weighted_delta_cpu(float *a, float *b, float *s, float *da, float *db, float *ds, int n, float *dc);

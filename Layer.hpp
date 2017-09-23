@@ -438,6 +438,8 @@ public:
             new_data_size = s.width * s.height * channels + _extra;
         }
 
+        _input_channels = channels;
+
         new_data_size *= batch;
         _output.resize(new_data_size);
         _delta.resize(new_data_size);
@@ -451,13 +453,35 @@ public:
     void loadWeights(std::istream &in) override {
         (void)in;
     }
+
+    const std::vector<float> &forward(const std::vector<float> &input) override {
+        if (_flatten) {
+#if 0
+            memcpy(_output, _input, l.outputs*l.batch*sizeof(float));
+            flatten(l.output, l.w*l.h, l.c, l.batch, !_reverse);
+#endif
+            throw std::invalid_argument("Reorg case not implemented (yet).");
+        } else if (_extra) {
+#if 0
+            for (size_t i = 0; i < _batch; ++i){
+                copy_cpu(l.inputs, net.input + i*l.inputs, 1, l.output + i*l.outputs, 1);
+            }
+#endif
+            throw std::invalid_argument("Reorg case not implemented (yet).");
+        } else {
+            reorg_cpu(&input[0], _input_size.width, _input_size.height, _input_channels, _batch, _stride, _reverse, &_output[0]);
+        }
+        return _output;
+    }
 private:
     std::vector<float>   _delta;
     Size   _input_size;
+    size_t _input_channels;
     size_t _stride;
     bool _reverse;
     bool _flatten;
     bool _extra;
+    size_t _batch = 1;
 };
 
 class RegionLayer : public Layer {
