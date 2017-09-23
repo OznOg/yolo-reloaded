@@ -486,11 +486,11 @@ private:
 
 class RegionLayer : public Layer {
 public:
-    RegionLayer(int num, int classes, int coords, const std::vector<float> &biases) :
-        _num(num), _classes(classes), _coords(coords), _biases(biases.begin(), biases.end()) {}
+    RegionLayer(int num, int classes, int coords, size_t side, bool softmax, const std::vector<float> &biases) :
+        _num(num), _classes(classes), _coords(coords), _side(side), _softmax(softmax), _biases(biases.begin(), biases.end()) {}
 
     void setInputFormat(const Size &s, size_t channels, size_t batch) override {
-        _input_size = s;;
+        _input_size = s;
         _filters = channels * (_classes + _coords + 1);
         setOutputSize(_input_size);
         setOutputChannels(channels);
@@ -508,12 +508,31 @@ public:
     void loadWeights(std::istream &in) override {
         (void)in;
     }
+
+    const std::vector<float> &forward(const std::vector<float> &input) override {
+        size_t locations = _side * _side;
+        _output = input;
+        if (_softmax){
+            for(size_t b = 0; b < _batch; ++b){
+                size_t index = b * _input_size.width * _input_size.height;
+                for (size_t i = 0; i < locations; ++i) {
+                    size_t offset = i * _classes;
+                    softmax(&_output[index + offset], _classes, 1, 1,
+                            &_output[index + offset]);
+                }
+            }
+        }
+        return _output;
+    }
 private:
     Size   _input_size;
     size_t _filters;
     int _num;
     int _classes;
     int _coords;
+    size_t _side;
+    size_t _softmax;
+    size_t _batch = 1;
 
     std::vector<float> _biases;
     std::vector<float> _bias_updates;

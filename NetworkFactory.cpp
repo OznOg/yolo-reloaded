@@ -210,8 +210,10 @@ static std::unique_ptr<Layer> makeLayer(const ConfigHunk &config) {
         int classes = config.getScalar<int>("classes").value_or(20);
         int num = config.getScalar<int>("num").value_or(1);
         auto biases = config.getVector<float>("anchors").value_or(std::vector<float>());
+        auto side = config.getScalar<size_t>("side").value_or(7);
+        auto softmax = config.getScalar<bool>("softmax").value_or(false);
 
-        auto layer = new RegionLayer(num, classes, coords, biases);
+        auto layer = new RegionLayer(num, classes, coords, side, softmax, biases);
 
 #if 0
         //FIXME not used yet...
