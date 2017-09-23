@@ -2,6 +2,7 @@
 
 #include <Size.hpp>
 
+#include <cstring>
 #include <string>
 #include <vector>
 #include <iostream>
@@ -395,9 +396,23 @@ public:
     void loadWeights(std::istream &in) override {
         (void)in;
     }
+
+    const std::vector<float> &forward(const std::vector<float> &/* input */) override {
+        size_t offset = 0;
+        for (const auto *layer : _input_layers) {
+            const auto &input = layer->getOutput();
+            size_t input_size = layer->getOutputSize().width * layer->getOutputSize().height;
+            for (size_t j = 0; j < _batch; ++j) {
+                std::memcpy(&_output[offset + j * _output.size()], &input[j * input_size], input_size);
+            }
+            offset += input_size;
+        }
+        return _output;
+    }
 private:
     std::vector<Layer *> _input_layers;
     std::vector<float>   _delta;
+    size_t _batch = 1;
 };
 
 class ReorgLayer : public Layer {
