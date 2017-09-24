@@ -212,8 +212,9 @@ static std::unique_ptr<Layer> makeLayer(const ConfigHunk &config) {
         auto biases = config.getVector<float>("anchors").value_or(std::vector<float>());
         auto side = config.getScalar<size_t>("side").value_or(7);
         auto softmax = config.getScalar<bool>("softmax").value_or(false);
+        auto background = config.getScalar<bool>("background").value_or(false);
 
-        auto layer = new RegionLayer(num, classes, coords, side, softmax, biases);
+        auto layer = new RegionLayer(num, classes, coords, side, softmax, background, biases);
 
 #if 0
         //FIXME not used yet...
@@ -221,7 +222,6 @@ static std::unique_ptr<Layer> makeLayer(const ConfigHunk &config) {
         auto sqrt = config.getScalar<int>("sqrt").value_or(0);
 
         auto softmax = config.getScalar<int>("softmax").value_or(0);
-        auto background = config.getScalar<int>("background").value_or(0);
         auto max_boxes = config.getScalar<int>("max").value_or(30);
         auto jitter = config.getScalar<float>("jitter").value_or(.2);
         auto rescore = config.getScalar<int>("rescore").value_or(0);

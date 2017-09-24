@@ -3,6 +3,7 @@
 #include <Size.hpp>
 
 #include <cstring>
+#include <cmath>
 #include <string>
 #include <vector>
 #include <iostream>
@@ -104,11 +105,58 @@ static inline Activation activationFromString(const std::string &str)
     return Activation::Relu; // FIXME is that really useful? (Legacy)
 }
 
+static inline float logistic_activate(float x) { return 1. / (1. + exp(-x)); }
+
+template <Activation a>
+static inline float activate(float x)
+{
+    switch (a) {
+        case Activation::Logistic:
+            return logistic_activate(x);
+#if 0
+        case LINEAR:
+            return linear_activate(x);
+        case LOGGY:
+            return loggy_activate(x);
+        case RELU:
+            return relu_activate(x);
+        case ELU:
+            return elu_activate(x);
+        case RELIE:
+            return relie_activate(x);
+        case RAMP:
+            return ramp_activate(x);
+        case LEAKY:
+            return leaky_activate(x);
+        case TANH:
+            return tanh_activate(x);
+        case PLSE:
+            return plse_activate(x);
+        case STAIR:
+            return stair_activate(x);
+        case HARDTAN:
+            return hardtan_activate(x);
+        case LHTAN:
+            return lhtan_activate(x);
+#endif
+        default:
+            throw std::invalid_argument("Activation Not handled");
+    }
+    return 0;
+}
+
+template <Activation a>
+static inline void activate_array(float *x, size_t n) {
+    for (size_t i = 0; i < n; ++i) {
+        x[i] = activate<a>(x[i]);
+    }
+}
+
 class ConvolutionalLayer : public Layer {
 public:
     ConvolutionalLayer(bool batch_normalize, size_t filters,
                        size_t size, size_t stride, size_t padding, Activation activation) :
-         _batch_normalize(batch_normalize), _size(size), 
+         _batch_normalize(batch_normalize), _size(size),
 	 _stride(stride), _padding(padding), _filters(filters), _activation(activation), _weights(), _biases(filters), _bias_updates(filters) { }
 
     void setInputFormat(const Format &format) override {
@@ -202,19 +250,19 @@ public:
     }
 
     void add_bias(float *output, const float *biases, int batch, int n, int size)
-    {       
+    {
         int i,j,b;
         for(b = 0; b < batch; ++b){
             for(i = 0; i < n; ++i){
-                for(j = 0; j < size; ++j){ 
+                for(j = 0; j < size; ++j){
                     output[(b*n + i)*size + j] += biases[i];
                 }
-            }   
-        }   
-    }       
+            }
+        }
+    }
 
     void scale_bias(float *output, const float *scales, int batch, int n, int size)
-    {   
+    {
         int i,j,b;
         for(b = 0; b < batch; ++b){
             for(i = 0; i < n; ++i){
@@ -222,8 +270,8 @@ public:
                     output[(b*n + i)*size + j] *= scales[i];
                 }
             }
-        }   
-    }       
+        }
+    }
 
     const std::vector<float> &forward(const std::vector<float> &input) override {
         _output._data.assign(1, _output._data.size()); //FIXME seems useless
@@ -282,21 +330,19 @@ private:
     // end of batch stuff
 };
 
-#if 0
 class MaxpoolLayer : public Layer {
 public:
     MaxpoolLayer(size_t size, size_t stride, size_t padding) : _size(size), _stride(stride), _padding(padding) {}
 
-    void setInputFormat(const Size &s, size_t channels, size_t batch) override {
-	_input_size = s;
-	setOutputSize((_input_size + 2 * _padding) / _stride);
+    void setInputFormat(const Format &format) override {
+	_input_fmt = format;
+        size_t width  = (_input_fmt.width + 2 * _padding) / _stride;
+        size_t height = (_input_fmt.height + 2 * _padding) / _stride;
 
-        setOutputChannels(channels);
+        _output = LayerData(Format(width, height, _input_fmt.channels, _input_fmt.batch));
 
-	size_t new_data_size = getOutputSize().width * getOutputSize().height * channels * batch;
-	_indexes.resize(new_data_size);
-	_output.resize(new_data_size);
-	_delta.resize(new_data_size);
+	_indexes.resize(_output._data.size());
+	_delta.resize(_output._data.size());
     }
 
     std::string getName() const override {
@@ -315,7 +361,7 @@ public:
         ssize_t w = getOutputSize().width;
         const auto &c = getOutputChannels();
 
-        for (size_t b = 0; b < _batch; ++b) {
+        for (size_t b = 0; b < _output._format.batch; ++b) {
             for (size_t k = 0; k < c; ++k) {
                 for (ssize_t i = 0; i < h; ++i) {
                     for (ssize_t j = 0; j < w; ++j) {
@@ -333,14 +379,14 @@ public:
                                 max   = std::max(val, max);
                             }
                         }
-                        _output[out_index] = max;
+                        _output._data[out_index] = max;
                         _indexes[out_index] = max_i;
                     }
                 }
             }
         }
 
-        return _output;
+        return _output._data;
     }
 private:
     Size   _input_size;
@@ -353,7 +399,6 @@ private:
     std::vector<float>  _delta;
 
 };
-#endif
 
 class RouteLayer : public Layer {
 public:
@@ -416,36 +461,36 @@ private:
     std::vector<float>   _delta;
 };
 
-#if 0
 class ReorgLayer : public Layer {
 public:
     ReorgLayer(size_t stride, bool reverse, bool flatten, bool extra) :
         _stride(stride), _reverse(reverse), _flatten(flatten), _extra(extra) {}
 
-    void setInputFormat(const Size &s, size_t channels, size_t batch) override {
-        _input_size = s;
-        size_t output_channels;
+    void setInputFormat(const Format &input_fmt) override {
+        _input_fmt = input_fmt;
+        size_t channels;
+        size_t width;
+        size_t height;
+
         if (_reverse) {
-            setOutputSize(_input_size * _stride);
-            output_channels = channels / (_stride * _stride);
+            width =_input_fmt.width * _stride;
+            height =_input_fmt.height * _stride;
+            channels = input_fmt.channels / (_stride * _stride);
         } else {
-            setOutputSize(_input_size / _stride);
-            output_channels = channels * (_stride * _stride);
+            width =_input_fmt.width / _stride;
+            height =_input_fmt.height / _stride;
+            channels = input_fmt.channels * (_stride * _stride);
         }
 
-	size_t new_data_size = getOutputSize().width * getOutputSize().height * output_channels;
         if (_extra) {
-            setOutputSize(Size(0, 0));
-            output_channels = 0;
-            new_data_size = s.width * s.height * channels + _extra;
+            // this extra stuff looks like a crappy hack
+            _output = LayerData(Format(0, 0, 0, _input_fmt.batch));
+            _output._data.resize((_input_fmt.width * _input_fmt.height * _input_fmt.channels + _extra) * _input_fmt.batch);
+        } else {
+            _output = LayerData(Format(width, height, channels, _input_fmt.batch));
         }
 
-        _input_channels = channels;
-
-        new_data_size *= batch;
-        _output.resize(new_data_size);
-        _delta.resize(new_data_size);
-        setOutputChannels(output_channels);
+        _delta.resize(_output._data.size());
     }
 
     std::string getName() const override {
@@ -471,36 +516,31 @@ public:
 #endif
             throw std::invalid_argument("Reorg case not implemented (yet).");
         } else {
-            reorg_cpu(&input[0], _input_size.width, _input_size.height, _input_channels, _batch, _stride, _reverse, &_output[0]);
+            reorg_cpu(&input[0], _input_fmt.width, _input_fmt.height, _input_fmt.channels, _input_fmt.batch, _stride, _reverse, &_output._data[0]);
         }
-        return _output;
+        return _output._data;
     }
 private:
     std::vector<float>   _delta;
-    Size   _input_size;
-    size_t _input_channels;
     size_t _stride;
     bool _reverse;
     bool _flatten;
     bool _extra;
-    size_t _batch = 1;
 };
 
 class RegionLayer : public Layer {
 public:
-    RegionLayer(int num, int classes, int coords, size_t side, bool softmax, const std::vector<float> &biases) :
-        _num(num), _classes(classes), _coords(coords), _side(side), _softmax(softmax), _biases(biases.begin(), biases.end()) {}
+    RegionLayer(size_t num, int classes, int coords, size_t side, bool softmax, bool background, const std::vector<float> &biases) :
+        _num(num), _classes(classes), _coords(coords), _side(side), _softmax(softmax), _background(background), _biases(biases.begin(), biases.end()) {}
 
-    void setInputFormat(const Size &s, size_t channels, size_t batch) override {
-        _input_size = s;
-        _filters = channels * (_classes + _coords + 1);
-        setOutputSize(_input_size);
-        setOutputChannels(channels);
+    void setInputFormat(const Format &format) override {
+        _input_fmt = Format(format.width, format.height, _num * (_classes + _coords + 1), format.batch);
 
-        _biases.resize(channels * 2, .5);
-        _bias_updates.resize(channels * 2);
-        _output.resize(getOutputSize().width * getOutputSize().height * channels * (_classes + _coords + 1) * batch);
-        _delta.resize(_output.size());
+        _output = LayerData(_input_fmt);
+
+        _biases.resize(format.channels * 2, .5);
+        _bias_updates.resize(format.channels * 2);
+        _delta.resize(_output._data.size());
     }
 
     std::string getName() const override {
@@ -513,33 +553,50 @@ public:
 
     const std::vector<float> &forward(const std::vector<float> &input) override {
         size_t locations = _side * _side;
-        _output = input;
-        if (_softmax){
-            for(size_t b = 0; b < _batch; ++b){
-                size_t index = b * _input_size.width * _input_size.height;
-                for (size_t i = 0; i < locations; ++i) {
-                    size_t offset = i * _classes;
-                    softmax(&_output[index + offset], _classes, 1, 1,
-                            &_output[index + offset]);
+        _output._data = input;
+
+        size_t wh = _output._format.width * _output._format.height;
+        for (size_t b = 0; b < _output._format.batch; ++b){
+            for (size_t n = 0; n < _num; ++n){
+                int index = entry_index(l, b, n * wh, 0);
+                activate_array<Activation::Logistic:>(&_output._data[index], 2 * wh);
+                index = entry_index(l, b, n * wh, l.coords);
+                if (!_background) {
+                    activate_array<Activation::Logistic:>(&output._data[0] + index, wh);
                 }
             }
         }
-        return _output;
+#if 0
+// FIXME will need to be eventually implemented :)
+        if (l.softmax_tree){
+
+            int i;
+            int count = l.coords + 1;
+            for (i = 0; i < l.softmax_tree->groups; ++i) {
+                int group_size = l.softmax_tree->group_size[i];
+                softmax_cpu(net.input + count, group_size, l.batch, l.inputs, l.n*l.w*l.h, 1, l.n*l.w*l.h, l.temperature, l.output + count);
+                count += group_size;
+            }
+        } else if (l.softmax)
+#endif
+        {
+            int index = entry_index(l, 0, 0, l.coords + !l.background);
+            softmax_cpu(net.input + index, l.classes + l.background, l.batch*l.n, l.inputs/l.n, l.w*l.h, 1, l.w*l.h, 1, l.output + index);
+        }
+
+        return _output._data;
     }
 private:
-    Size   _input_size;
-    size_t _filters;
-    int _num;
+    size_t _num;
     int _classes;
     int _coords;
     size_t _side;
-    size_t _softmax;
-    size_t _batch = 1;
+    bool _softmax;
+    bool _background;
 
     std::vector<float> _biases;
     std::vector<float> _bias_updates;
     std::vector<float> _delta;
 };
-#endif
 
 }
