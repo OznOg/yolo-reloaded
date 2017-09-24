@@ -16,24 +16,47 @@ extern "C" {
 
 namespace yolo {
 
+struct Format {
+    Format(size_t w, size_t h, size_t c, size_t b) : width(w), height(h), channels(c), batch(b) {}
+    Format() {}
+    size_t width = 0;
+    size_t height = 0;
+    size_t channels = 0;
+    size_t batch = 1;
+};
+
+struct LayerData {
+    LayerData(const Format &format) : _format(format),
+              _data(format.width * format.height * format.channels * format.batch) {}
+    LayerData() {}
+
+    Format _format;
+    std::vector<float> _data;
+};
+
+
 class Layer {
 public:
-    virtual void setInputFormat(const Size &s, size_t channels, size_t batch) = 0;
+    virtual void setInputFormat(const Format &format) = 0;
 
     virtual std::string getName() const = 0;
 
     virtual ~Layer() {}
 
-    const Size &getOutputSize() const {
-	return _output_size;
+    const Size getOutputSize() const { // FIXME deprecated
+       return Size(_output._format.width, _output._format.height);
+    }
+
+    const auto &getOutputChannels() const { // FIXME deprecated
+       return _output._format.channels;
     }
 
     const auto &getOutput() const {
-        return _output;
+        return _output._data;
     }
 
-    const auto &getOutputChannels() const {
-	return _channels;
+    const auto &getOutputFormat() const {
+        return _output._format;
     }
 
     virtual void loadWeights(std::istream &in) = 0;
@@ -42,23 +65,8 @@ public:
         throw std::invalid_argument("Forward not implemented for layer " + getName());
     }
 protected:
-    auto &getOutput() {
-        return _output;
-    }
-
-    void setOutputSize(const Size &s) {
-	_output_size = s;
-    }
-
-    void setOutputChannels(const size_t &channels) {
-	_channels = channels;
-    }
-
-    std::vector<float>   _output; // FIXME make private
-
-private:
-    Size _output_size;
-    size_t _channels;
+    Format _input_fmt;
+    LayerData _output;
 };
 
 
@@ -100,20 +108,18 @@ class ConvolutionalLayer : public Layer {
 public:
     ConvolutionalLayer(bool batch_normalize, size_t filters,
                        size_t size, size_t stride, size_t padding, Activation activation) :
-         _batch_normalize(batch_normalize), _filters(filters), _size(size), 
-	 _stride(stride), _padding(padding), _activation(activation), _weights(), _biases(filters), _bias_updates(filters) { setOutputChannels(filters); }
+         _batch_normalize(batch_normalize), _size(size), 
+	 _stride(stride), _padding(padding), _filters(filters), _activation(activation), _weights(), _biases(filters), _bias_updates(filters) { }
 
-    void setInputFormat(const Size &s, size_t channels, size_t batch) override {
-	_input_size = s;
-        _input_channels = channels;
-	_weights.resize(_input_channels * _filters * _size * _size);
+    void setInputFormat(const Format &format) override {
+	_input_fmt = format;
+
+        size_t width  = (_input_fmt.width + 2 * _padding - _size) / _stride + 1;
+        size_t height = (_input_fmt.height + 2 * _padding - _size) / _stride + 1;
+        _output = LayerData(Format(width, height, _filters, format.batch));
+
+	_weights.resize(format.channels * _filters * _size * _size);
 	_weights_updates.resize(_weights.size());
-
-	setOutputSize((_input_size + 2 * _padding - _size) / _stride + 1);
-
-	_output.resize(getOutputSize().width * getOutputSize().height * _filters * batch);
-
-	_delta.resize(_output.size());
 
 	if (_batch_normalize) {
 	    _scales.resize(_filters, 1.);
@@ -128,8 +134,9 @@ public:
 	    _rolling_mean.resize(_filters);
 	    _rolling_variance.resize(_filters);
 
-	    _x.resize(_output.size());
-	    _x_norm.resize(_output.size());
+            const Format &f = _output._format;
+	    _x.resize(f.width * f.height * f.channels * f.batch);
+	    _x_norm.resize(_x.size());
 	}
     }
 
@@ -219,41 +226,38 @@ public:
     }       
 
     const std::vector<float> &forward(const std::vector<float> &input) override {
-        _output.assign(1, _output.size()); //FIXME seems useless
+        _output._data.assign(1, _output._data.size()); //FIXME seems useless
 
-        std::vector<float> temp(getOutputSize().width * getOutputSize().height * (_input_channels * _size * _size /* ksize */));
+        std::vector<float> temp(_output._format.width * _output._format.height * (_input_fmt.channels * _size * _size /* ksize */));
 
-        im2col_cpu(input, _input_channels, _input_size.height, _input_size.width, _size, _stride, _padding, temp);
+        im2col_cpu(input, _input_fmt.channels, _input_fmt.height, _input_fmt.width, _size, _stride, _padding, temp);
 
         int m = _filters;
-        int k = _input_channels * _size * _size;
-        int n = getOutputSize().width * getOutputSize().height;
+        int k = _input_fmt.channels * _size * _size;
+        int n = _output._format.width * _output._format.height;;
 
 
         float *a = &_weights[0];
         float *b = &temp[0];
-        float *c = &_output[0];
+        float *c = &_output._data[0];
 
         gemm(0, 0, m, n, k, 1, a, k, b, n, 1, c, n);
 
         if (_batch_normalize) {
-            _x = _output;
-            normalize_cpu(c, &_rolling_mean[0], &_rolling_variance[0], _batch, _filters, n);
-            scale_bias(c, &_scales[0], _batch, _filters, n);
+            _x = _output._data;
+            normalize_cpu(c, &_rolling_mean[0], &_rolling_variance[0], _output._format.batch, _output._format.channels, n);
+            scale_bias(c, &_scales[0], _output._format.batch, _output._format.channels, n);
         }
-        add_bias(c, &_biases[0], _batch, _filters, n);
+        add_bias(c, &_biases[0], _output._format.batch, _output._format.channels, n);
 
-        return _output;
+        return _output._data;
     }
 private:
-    Size   _input_size;
-    size_t _input_channels;
     bool   _batch_normalize = false;
-    size_t _filters = 1;
     size_t _size = 1;
     size_t _stride = 1;
     size_t _padding;
-    size_t _batch = 1;
+    size_t _filters;
     Activation _activation = Activation::Leaky;
 
     std::vector<float> _weights;
@@ -261,9 +265,6 @@ private:
 
     std::vector<float> _biases;
     std::vector<float> _bias_updates;
-
-    std::vector<float> _delta;
-
 
     // batch stuff
     // FIXME is that really usefull? would it be better to have a dedicated struct?
@@ -281,6 +282,7 @@ private:
     // end of batch stuff
 };
 
+#if 0
 class MaxpoolLayer : public Layer {
 public:
     MaxpoolLayer(size_t size, size_t stride, size_t padding) : _size(size), _stride(stride), _padding(padding) {}
@@ -351,6 +353,7 @@ private:
     std::vector<float>  _delta;
 
 };
+#endif
 
 class RouteLayer : public Layer {
 public:
@@ -361,7 +364,7 @@ public:
                 outputs += layer->getOutput().size();
             }
             _delta.resize(outputs);
-            _output.resize(outputs);;
+            _output._data.resize(outputs);;
 
 
 	    auto &first = *input_layers[0];
@@ -379,14 +382,13 @@ public:
 		    outChannels = 0;
 		}
 	    }
-	    setOutputSize(outputSize);
-	    setOutputChannels(outChannels);
-
+	    _output = LayerData(Format(outputSize.width, outputSize.height, outChannels, 1));
         }
 
-    void setInputFormat(const Size &, size_t, size_t) override {
+    void setInputFormat(const Format &f) override {
         // FIXME having this empty really enforce the fact that route is not a layer...
         // need more investigation in order to rework that properly
+        _output = LayerData(Format(_output._format.width, _output._format.height, _output._format.channels, f.batch));
     }
 
     std::string getName() const override {
@@ -402,19 +404,19 @@ public:
         for (const auto *layer : _input_layers) {
             const auto &input = layer->getOutput();
             size_t input_size = layer->getOutputSize().width * layer->getOutputSize().height;
-            for (size_t j = 0; j < _batch; ++j) {
-                std::memcpy(&_output[offset + j * _output.size()], &input[j * input_size], input_size);
+            for (size_t j = 0; j < _output._format.batch; ++j) {
+                std::memcpy(&_output._data[offset + j * _output._data.size()], &input[j * input_size], input_size);
             }
             offset += input_size;
         }
-        return _output;
+        return _output._data;
     }
 private:
     std::vector<Layer *> _input_layers;
     std::vector<float>   _delta;
-    size_t _batch = 1;
 };
 
+#if 0
 class ReorgLayer : public Layer {
 public:
     ReorgLayer(size_t stride, bool reverse, bool flatten, bool extra) :
@@ -538,5 +540,6 @@ private:
     std::vector<float> _bias_updates;
     std::vector<float> _delta;
 };
+#endif
 
 }

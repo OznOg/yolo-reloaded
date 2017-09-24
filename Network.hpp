@@ -133,12 +133,11 @@ public:
     void addLayer(std::unique_ptr<Layer> layer) {
 	/* For the first layer we give the network input size; for next ones,
 	 * each layer N gets the output size of the layer N - 1 */
-	const auto &size = _layers.empty() ? _input_size : _layers.back()->getOutputSize();
-	auto &channels = _layers.empty() ? _channels : _layers.back()->getOutputChannels();
-	layer->setInputFormat(size, channels, _batch);
+	const auto &format = _layers.empty() ? Format(_input_size.width, _input_size.height, _channels, _batch) : _layers.back()->getOutputFormat();
+	layer->setInputFormat(format);
 
 	std::cout << std::setw(4) << _layers.size() << std::setw(15) << layer->getName()
-                  << std::setw(4) << size.width << " x " << std::setw(4) << size.height << " x " << std::setw(4) << channels
+                  << std::setw(4) << format.width << " x " << std::setw(4) << format.height << " x " << std::setw(4) << format.channels
                   << "   ->  " 
                   << std::setw(4) << layer->getOutputSize().width << " x " << std::setw(4) <<  layer->getOutputSize().height << " x " << std::setw(4)
                   << layer->getOutputChannels() << std::endl;
