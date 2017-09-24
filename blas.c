@@ -259,7 +259,7 @@ float dot_cpu(int N, float *X, int INCX, float *Y, int INCY)
     return dot;
 }
 
-void softmax(float *input, int n, float temp, int stride, float *output)
+void softmax(const float *input, int n, float temp, int stride, float *output)
 {
     int i;
     float sum = 0;
@@ -278,7 +278,7 @@ void softmax(float *input, int n, float temp, int stride, float *output)
 }
 
 
-void softmax_cpu(float *input, int n, int batch, int batch_offset, int groups, int group_offset, int stride, float temp, float *output)
+void softmax_cpu(const float *input, int n, int batch, int batch_offset, int groups, int group_offset, int stride, float temp, float *output)
 {
     int g, b;
     for(b = 0; b < batch; ++b){

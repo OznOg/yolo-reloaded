@@ -274,9 +274,9 @@ public:
     }
 
     const std::vector<float> &forward(const std::vector<float> &input) override {
-        _output._data.assign(1, _output._data.size()); //FIXME seems useless
+        _output._data.assign(_output._data.size(), 0); //FIXME seems useless
 
-        std::vector<float> temp(_output._format.width * _output._format.height * (_input_fmt.channels * _size * _size /* ksize */));
+        std::vector<float> temp(_input_fmt.width * _input_fmt.height * (_input_fmt.channels * _size * _size /* ksize */));
 
         im2col_cpu(input, _input_fmt.channels, _input_fmt.height, _input_fmt.width, _size, _stride, _padding, temp);
 
@@ -551,18 +551,26 @@ public:
         (void)in;
     }
 
+    inline int entry_index(size_t batch, size_t location, size_t entry) {   
+        size_t wh = _input_fmt.width * _input_fmt.height;
+        size_t n =   location / wh;
+        size_t loc = location % wh;
+        size_t one_size = _output._format.width * _output._format.height * _output._format.channels;
+
+        return batch * one_size + n * wh * (_coords + _classes + 1) + entry * wh + loc;
+    }   
+  
     const std::vector<float> &forward(const std::vector<float> &input) override {
-        size_t locations = _side * _side;
         _output._data = input;
 
         size_t wh = _output._format.width * _output._format.height;
         for (size_t b = 0; b < _output._format.batch; ++b){
             for (size_t n = 0; n < _num; ++n){
-                int index = entry_index(l, b, n * wh, 0);
-                activate_array<Activation::Logistic:>(&_output._data[index], 2 * wh);
-                index = entry_index(l, b, n * wh, l.coords);
+                int index = entry_index(b, n * wh, 0);
+                activate_array<Activation::Logistic>(&_output._data[index], 2 * wh);
+                index = entry_index(b, n * wh, _coords);
                 if (!_background) {
-                    activate_array<Activation::Logistic:>(&output._data[0] + index, wh);
+                    activate_array<Activation::Logistic>(&_output._data[0] + index, wh);
                 }
             }
         }
@@ -580,8 +588,9 @@ public:
         } else if (l.softmax)
 #endif
         {
-            int index = entry_index(l, 0, 0, l.coords + !l.background);
-            softmax_cpu(net.input + index, l.classes + l.background, l.batch*l.n, l.inputs/l.n, l.w*l.h, 1, l.w*l.h, 1, l.output + index);
+            int index = entry_index(0, 0, _coords + !_background);
+            softmax_cpu(&input[index], _classes + _background, _input_fmt.batch * _num,
+                        _output._data.size() / _input_fmt.batch, wh, 1, wh, 1, &_output._data[index]);
         }
 
         return _output._data;
