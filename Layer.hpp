@@ -106,6 +106,7 @@ static inline Activation activationFromString(const std::string &str)
 }
 
 static inline float logistic_activate(float x) { return 1. / (1. + exp(-x)); }
+static inline float leaky_activate(float x) { return x > 0 ? x : .1 * x; }
 
 template <Activation a>
 static inline float activate(float x)
@@ -113,6 +114,8 @@ static inline float activate(float x)
     switch (a) {
         case Activation::Logistic:
             return logistic_activate(x);
+        case Activation::Leaky:
+            return leaky_activate(x);
 #if 0
         case LINEAR:
             return linear_activate(x);
@@ -126,8 +129,6 @@ static inline float activate(float x)
             return relie_activate(x);
         case RAMP:
             return ramp_activate(x);
-        case LEAKY:
-            return leaky_activate(x);
         case TANH:
             return tanh_activate(x);
         case PLSE:
@@ -297,6 +298,8 @@ public:
             scale_bias(c, &_scales[0], _output._format.batch, _output._format.channels, n);
         }
         add_bias(c, &_biases[0], _output._format.batch, _output._format.channels, n);
+
+        activate_array<Activation::Leaky>(c, m * n * _output._format.batch/* FIXME use correct activation, l.activation*/);
 
         return _output._data;
     }
