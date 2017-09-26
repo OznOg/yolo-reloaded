@@ -20,3 +20,5 @@ include_directories(.)
 add_executable(darknet darknet.cpp NetworkFactory.cpp gemm.c blas.c)
 target_link_libraries(darknet ${OpenCV_LIBS} -fopenmp)
 
+add_executable(test test.cpp gemm.c blas.c)
+target_link_libraries(test -fopenmp)
