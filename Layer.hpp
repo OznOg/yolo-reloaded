@@ -9,6 +9,7 @@
 #include <iostream>
 #include <iomanip>
 #include <iterator>
+#include <limits>
 
 extern "C" {
 #include "gemm.h"
