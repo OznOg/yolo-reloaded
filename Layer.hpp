@@ -369,15 +369,22 @@ public:
             for (size_t k = 0; k < c; ++k) {
                 for (ssize_t i = 0; i < h; ++i) {
                     for (ssize_t j = 0; j < w; ++j) {
+
                         int out_index = j + w*(i + h*(k + c*b));
+
                         float max = std::numeric_limits<float>::lowest();
+
                         int max_i = -1;
+
                         for (size_t n = 0; n < _size; ++n) {
                             for (size_t m = 0; m < _size; ++m) {
                                 ssize_t cur_h = h_offset + i*_stride + n;
                                 ssize_t cur_w = w_offset + j*_stride + m;
-                                int index = cur_w + w*(cur_h + h*(k + b* c));
-                                bool valid = (cur_h >= 0 && cur_h < h && cur_w >= 0 && cur_w < w);
+
+                                int index = cur_w + _input_fmt.width * (cur_h + _input_fmt.height * (k + b * _input_fmt.channels));
+                                int valid = (cur_h >= 0 && cur_h < (ssize_t)_input_fmt.height
+                                          && cur_w >= 0 && cur_w < (ssize_t)_input_fmt.width);
+
                                 float val = valid ? input[index] : std::numeric_limits<float>::lowest();
                                 max_i = (val > max) ? index : max_i;
                                 max   = std::max(val, max);
