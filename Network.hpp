@@ -165,8 +165,11 @@ public:
 
     bool predict(const std::vector<float> &_input) {
         auto *input = &_input;
+        size_t idx = 0;
         for (auto &layer : _layers) {
+            std::cout << "Processing layer " << idx++ << " ..." << std::flush;
             input = &layer->forward(*input);
+            std::cout << " done" << std::endl;
         }
         return true;
     }
