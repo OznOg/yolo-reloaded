@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Size.hpp>
+#include "gemm.hpp"
 
 #include <cstring>
 #include <cmath>
@@ -12,7 +13,6 @@
 #include <limits>
 
 extern "C" {
-#include "gemm.h"
 #include "blas.h"
 }
 
@@ -291,7 +291,7 @@ public:
         float *b = &temp[0];
         float *c = &_output._data[0];
 
-        gemm(0, 0, m, n, k, 1, a, k, b, n, 1, c, n);
+        gemm<false, false>(m, n, k, 1, a, k, b, n, 1, c, n);
 
         if (_batch_normalize) {
             _x = _output._data;
