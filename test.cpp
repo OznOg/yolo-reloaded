@@ -21,13 +21,17 @@ int main(int argc, char **argv) {
     std::vector<float> input(608 * 608 * 3);
     in.read((char *)&input[0], input.size() * sizeof(float));
 
-    std::vector<float> expected_output(608 * 608 * 32);
+    std::vector<float> expected_output(11829248 / sizeof(float));
     out.read((char *)&expected_output[0], expected_output.size() * sizeof(float));
 
 
     yolo::ConvolutionalLayer cl(true, 32, 3, 1, 1, yolo::Activation::Leaky);
 
     cl.setInputFormat(yolo::Format(608, 608, 3, 1));
+
+    yolo::MaxpoolLayer ml(2, 2, 0);
+
+    ml.setInputFormat(yolo::Format(608, 608, 32, 1));
 
     auto weightsFile = std::ifstream(argv[3]);
 
@@ -51,8 +55,9 @@ int main(int argc, char **argv) {
     }
 
     cl.loadWeights(weightsFile);
+    ml.loadWeights(weightsFile);
 
-    const std::vector<float> &output = cl.forward(input);
+    const std::vector<float> &output = ml.forward(cl.forward(input));
 
     size_t idx = 0;
     for (const auto &f : expected_output) {
