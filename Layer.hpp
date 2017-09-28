@@ -413,33 +413,32 @@ private:
 
 class RouteLayer : public Layer {
 public:
-    RouteLayer(const std::vector<Layer *> input_layers) :
-        _input_layers(input_layers) {
-            size_t outputs = 0;
-            for (const auto *layer : input_layers){
-                outputs += layer->getOutput().size();
-            }
-            _delta.resize(outputs);
-            _output._data.resize(outputs);;
+    RouteLayer(const std::vector<Layer *> input_layers) : _input_layers(input_layers) {
+	size_t outputs = 0;
+	for (const auto *layer : input_layers){
+	    outputs += layer->getOutput().size();
+	}
+	_delta.resize(outputs);
+	_output._data.resize(outputs);;
 
 
-	    auto &first = *input_layers[0];
-	    Size outputSize = first.getOutputSize();
-	    size_t outChannels = first.getOutputChannels();
+	auto &first = *input_layers[0];
+	Size outputSize = first.getOutputSize();
+	size_t outChannels = first.getOutputChannels();
 
-            for (const auto *next : input_layers) {
-                if (&first == next)
-                    continue; // skip first one as it was used for init
+	for (const auto *next : input_layers) {
+	    if (&first == next)
+		continue; // skip first one as it was used for init
 
-		if(next->getOutputSize() == first.getOutputSize()) {
-		    outChannels += next->getOutputChannels();
-		} else {
-		    outputSize = Size(0, 0);
-		    outChannels = 0;
-		}
+	    if(next->getOutputSize() == first.getOutputSize()) {
+		outChannels += next->getOutputChannels();
+	    } else {
+		outputSize = Size(0, 0);
+		outChannels = 0;
 	    }
-	    _output = LayerData(Format(outputSize.width, outputSize.height, outChannels, 1));
-        }
+	}
+	_output = LayerData(Format(outputSize.width, outputSize.height, outChannels, 1));
+    }
 
     void setInputFormat(const Format &f) override {
         // FIXME having this empty really enforce the fact that route is not a layer...
@@ -459,11 +458,10 @@ public:
         size_t offset = 0;
         for (const auto *layer : _input_layers) {
             const auto &input = layer->getOutput();
-            size_t input_size = layer->getOutputSize().width * layer->getOutputSize().height;
             for (size_t j = 0; j < _output._format.batch; ++j) {
-                std::memcpy(&_output._data[offset + j * _output._data.size()], &input[j * input_size], input_size);
+                std::memcpy(&_output._data[offset + j * _output._data.size()], &input[j * input.size()], input.size() * sizeof(float));
             }
-            offset += input_size;
+            offset += input.size();
         }
         return _output._data;
     }
