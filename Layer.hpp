@@ -108,49 +108,37 @@ static inline Activation activationFromString(const std::string &str)
 
 static inline float logistic_activate(float x) { return 1. / (1. + exp(-x)); }
 static inline float leaky_activate(float x) { return x > 0 ? x : .1 * x; }
+static inline float linear_activate(float x) { return x; }
 
-template <Activation a>
-static inline float activate(float x)
+static inline float (*getActivationMethode(Activation a))(float)
 {
     switch (a) {
         case Activation::Logistic:
-            return logistic_activate(x);
+            return logistic_activate;
         case Activation::Leaky:
-            return leaky_activate(x);
-#if 0
-        case LINEAR:
-            return linear_activate(x);
-        case LOGGY:
-            return loggy_activate(x);
-        case RELU:
-            return relu_activate(x);
-        case ELU:
-            return elu_activate(x);
-        case RELIE:
-            return relie_activate(x);
-        case RAMP:
-            return ramp_activate(x);
-        case TANH:
-            return tanh_activate(x);
-        case PLSE:
-            return plse_activate(x);
-        case STAIR:
-            return stair_activate(x);
-        case HARDTAN:
-            return hardtan_activate(x);
-        case LHTAN:
-            return lhtan_activate(x);
-#endif
-        default:
+            return leaky_activate;
+        case Activation::Linear:
+            return linear_activate;
+
+        case Activation::Elu:
+        case Activation::Hardtan:
+        case Activation::Lhtan:
+        case Activation::Loggy:
+        case Activation::Plse:
+        case Activation::Ramp:
+        case Activation::Relie:
+        case Activation::Relu:
+        case Activation::Stair:
+        case Activation::Tanh:
             throw std::invalid_argument("Activation Not handled");
     }
-    return 0;
+    return nullptr;
 }
 
-template <Activation a>
-static inline void activate_array(float *x, size_t n) {
+static inline void activate_array(Activation a, float *x, size_t n) {
+    const auto &activate = getActivationMethode(a);
     for (size_t i = 0; i < n; ++i) {
-        x[i] = activate<a>(x[i]);
+        x[i] = activate(x[i]);
     }
 }
 
@@ -300,7 +288,7 @@ public:
         }
         add_bias(c, &_biases[0], _output._format.batch, _output._format.channels, n);
 
-        activate_array<Activation::Leaky>(c, m * n * _output._format.batch/* FIXME use correct activation, l.activation*/);
+        activate_array(_activation, c, m * n * _output._format.batch);
 
         return _output._data;
     }
@@ -576,10 +564,10 @@ public:
         for (size_t b = 0; b < _output._format.batch; ++b){
             for (size_t n = 0; n < _num; ++n){
                 int index = entry_index(b, n * wh, 0);
-                activate_array<Activation::Logistic>(&_output._data[index], 2 * wh);
+                activate_array(Activation::Logistic, &_output._data[index], 2 * wh);
                 index = entry_index(b, n * wh, _coords);
                 if (!_background) {
-                    activate_array<Activation::Logistic>(&_output._data[0] + index, wh);
+                    activate_array(Activation::Logistic, &_output._data[0] + index, wh);
                 }
             }
         }
