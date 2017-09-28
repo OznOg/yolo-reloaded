@@ -9,7 +9,7 @@ set(CMAKE_C_FLAGS "-Wall -Wextra")
 set(CMAKE_C_FLAGS_DEBUG "-O0 -ggdb")
 set(CMAKE_C_FLAGS_RELEASE "-O3")
 
-set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -Werror -Wextra -fopenmp")
+set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -Werror -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -ggdb")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
@@ -17,8 +17,12 @@ find_package(OpenCV REQUIRED)
 
 include_directories(.)
 
-add_executable(darknet darknet.cpp NetworkFactory.cpp gemm.cpp blas.c)
-target_link_libraries(darknet ${OpenCV_LIBS} -fopenmp)
+add_library(gemm STATIC gemm.cpp)
+target_link_libraries(gemm -fopenmp)
+SET_TARGET_PROPERTIES(gemm PROPERTIES COMPILE_FLAGS "-O4 -fopenmp")
 
-add_executable(test test.cpp gemm.cpp blas.c)
-target_link_libraries(test -fopenmp)
+add_executable(darknet darknet.cpp NetworkFactory.cpp blas.c)
+target_link_libraries(darknet ${OpenCV_LIBS} gemm)
+
+add_executable(test test.cpp blas.c)
+target_link_libraries(test gemm)
