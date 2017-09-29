@@ -11,6 +11,7 @@
 #include <iomanip>
 #include <iterator>
 #include <limits>
+#include <set>
 
 extern "C" {
 #include "blas.h"
@@ -548,15 +549,62 @@ public:
         (void)in;
     }
 
-    inline int entry_index(size_t batch, size_t location, size_t entry) {   
+    inline int entry_index(size_t batch, size_t location, size_t entry) const {
         size_t wh = _input_fmt.width * _input_fmt.height;
         size_t n =   location / wh;
         size_t loc = location % wh;
         size_t one_size = _output._format.width * _output._format.height * _output._format.channels;
 
         return batch * one_size + n * wh * (_coords + _classes + 1) + entry * wh + loc;
-    }   
-  
+    }
+
+    struct Box {
+        float x, y, w, h;
+    };
+    struct Prediction {
+        Box box;
+        std::set<float> probs;
+    };
+
+    Box get_region_box(const std::vector<float> &x, const std::vector<float> &biases,
+                       int n, int index, int i, int j, int w, int h, int stride) const {
+        Box b;
+        b.x = (i + x[index + 0 * stride]) / w;
+        b.y = (j + x[index + 1 * stride]) / h;
+        b.w = exp(x[index + 2 * stride]) * biases[2 * n] / w;
+        b.h = exp(x[index + 3 * stride]) * biases[2 * n + 1] / h;
+        return b;
+    }
+
+    auto get_region_boxes() const {
+        std::vector<Prediction> predicitons;
+
+        const auto &predictions = _output._data;
+        auto w = _input_fmt.width;
+        auto h = _input_fmt.height;
+        for (size_t i = 0; i < w * h; ++i) {
+            int row = i / w;
+            int col = i % w;
+            for(size_t n = 0; n < _num; ++n) {
+                Prediction loc;
+
+                int index = n * w * h + i;
+                int obj_index  = entry_index(0, index, _coords);
+                int box_index  = entry_index(0, index, 0);
+                float scale = _background ? 1 : predictions[obj_index];
+                loc.box = get_region_box(predictions, _biases, n, box_index, col, row, w, h, w * h);
+
+                for (size_t j = 0; j < _classes; ++j) {
+                    int class_index = entry_index(0, index, _coords + 1 + j);
+                    float prob = scale * predictions[class_index];
+                    loc.probs.insert(prob);
+                }
+                predicitons.push_back(loc);
+            }
+        }
+        return predicitons;
+    }
+
     const std::vector<float> &forward(const std::vector<float> &input) override {
         _output._data = input;
 
@@ -594,7 +642,7 @@ public:
     }
 private:
     size_t _num;
-    int _classes;
+    size_t _classes;
     int _coords;
     size_t _side;
     bool _softmax;

@@ -171,6 +171,10 @@ public:
             input = &layer->forward(*input);
             std::cout << " done" << std::endl;
         }
+
+        const auto &layer = dynamic_cast<RegionLayer &>(*_layers.back());
+        auto locations = layer.get_region_boxes();
+
         return true;
     }
 
