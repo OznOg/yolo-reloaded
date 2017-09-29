@@ -615,7 +615,7 @@ public:
                 activate_array(Activation::Logistic, &_output._data[index], 2 * wh);
                 index = entry_index(b, n * wh, _coords);
                 if (!_background) {
-                    activate_array(Activation::Logistic, &_output._data[0] + index, wh);
+                    activate_array(Activation::Logistic, &_output._data[index], wh);
                 }
             }
         }
@@ -630,12 +630,13 @@ public:
                 softmax_cpu(net.input + count, group_size, l.batch, l.inputs, l.n*l.w*l.h, 1, l.n*l.w*l.h, l.temperature, l.output + count);
                 count += group_size;
             }
-        } else if (l.softmax)
+        } else
 #endif
+        if (_softmax)
         {
             int index = entry_index(0, 0, _coords + !_background);
             softmax_cpu(&input[index], _classes + _background, _input_fmt.batch * _num,
-                        _output._data.size() / _input_fmt.batch, wh, 1, wh, 1, &_output._data[index]);
+                        _output._data.size() / _input_fmt.batch / _num, wh, 1, wh, 1, &_output._data[index]);
         }
 
         return _output._data;
