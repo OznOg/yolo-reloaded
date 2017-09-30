@@ -1,0 +1,24 @@
+language: cpp
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      - cmake-data
+      - cmake
+      - libopencv-dev
+      - libgtest-dev
+
+install:
+    #  NOTE gtest install workaround
+    - cd /usr/src/gtest
+    - sudo cmake .
+    - sudo make
+    - sudo mv libgtest* /usr/lib/
+    - cd "${TRAVIS_BUILD_DIR}"
+    # -- workaround end
+    - sudo apt-get install -qq g++-6
+    - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-6 90
+
+
+script: mkdir build && cd build && cmake .. && make -j4 test && ./test
