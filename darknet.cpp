@@ -9,6 +9,28 @@
 
 using namespace yolo;
 
+
+static Box correctScale(const Box &box, size_t imw, size_t imh, size_t netw, size_t neth)
+{
+    size_t new_w;
+    size_t new_h;
+    if ((float)netw / imw < (float)neth / imh) {
+        new_w = netw;
+        new_h = (imh * netw) / imw;
+    } else {
+        new_h = neth;
+        new_w = (imw * neth) / imh;
+    }
+
+    Box b;
+    b.x = (box.x - (netw - new_w) / 2. / netw) / ((float)new_w / netw);
+    b.y = (box.y - (neth - new_h) / 2. / neth) / ((float)new_h / neth);
+    b.w = box.w / ((float)new_w / netw);
+    b.h = box.h / ((float)new_h / neth);
+
+    return b;
+}
+
 bool run_detect(const std::vector<std::string> &args) {
     if (args.size() < 3) {
 	std::cerr << "usage: detect needs at least 3 parameters." << std::endl << std::endl;
@@ -83,11 +105,12 @@ bool run_detect(const std::vector<std::string> &args) {
     for (const auto &p : predictions) {
         if (p.prob > 0.6) {
             std::cout << p.prob << " box @" << p.box.x << " " << p.box.y << " class=" << p.classIndex << std::endl;
-            const Box &b = p.box;
-            int left  = (b.x-b.w/2.)*imageInteger.cols;
-            int right = (b.x+b.w/2.)*imageInteger.cols;
-            int top   = (b.y-b.h/2.)*imageInteger.rows;
-            int bot   = (b.y+b.h/2.)*imageInteger.rows;
+            const Box &b = correctScale(p.box, imageInteger.cols, imageInteger.rows, net->_input_size.width, net->_input_size.height);
+
+            int left  = (b.x - b.w / 2.) * imageInteger.cols;
+            int right = (b.x + b.w / 2.) * imageInteger.cols;
+            int top   = (b.y - b.h / 2.) * imageInteger.rows;
+            int bot   = (b.y + b.h / 2.) * imageInteger.rows;
 
             cv::rectangle(imageInteger, cv::Point(left, top), cv::Point(right, bot), cv::Scalar(55, 55, 55), 2);
         }

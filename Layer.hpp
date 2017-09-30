@@ -194,7 +194,7 @@ public:
         in.read((char *)&_weights[0], _weights.size() * sizeof(float));
     }
 
-    float im2col_get_pixel(const std::vector<float> &im, int height, int width, int /*channels*/,
+    static inline float im2col_get_pixel(const std::vector<float> &im, int height, int width, int /*channels*/,
             int row, int col, int channel, int pad)
     {
         row -= pad;
