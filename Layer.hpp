@@ -265,9 +265,9 @@ public:
     }
 
     const std::vector<float> &forward(const std::vector<float> &input) override {
-        _output._data.assign(_output._data.size(), 0); //FIXME seems useless
 
-        std::vector<float> temp(_input_fmt.width * _input_fmt.height * (_input_fmt.channels * _size * _size /* ksize */));
+        std::vector<float> temp;
+        temp.reserve(_input_fmt.width * _input_fmt.height * (_input_fmt.channels * _size * _size /* ksize */));
 
         im2col_cpu(input, _input_fmt.channels, _input_fmt.height, _input_fmt.width, _size, _stride, _padding, temp);
 
