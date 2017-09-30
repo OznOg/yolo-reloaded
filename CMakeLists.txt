@@ -15,6 +15,10 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 find_package(OpenCV REQUIRED)
 
+enable_testing()
+find_package(GTest REQUIRED)
+include_directories(${GTEST_INCLUDE_DIRS})
+
 include_directories(.)
 
 add_library(gemm STATIC gemm.cpp)
@@ -25,4 +29,8 @@ add_executable(darknet darknet.cpp NetworkFactory.cpp blas.c)
 target_link_libraries(darknet ${OpenCV_LIBS} gemm)
 
 add_executable(test test.cpp blas.c)
-target_link_libraries(test gemm)
+target_link_libraries(test gemm ${GTEST_BOTH_LIBRARIES})
+SET_TARGET_PROPERTIES(test PROPERTIES COMPILE_FLAGS "-O0 -ggdb")
+
+add_test(AllTests test)
+
