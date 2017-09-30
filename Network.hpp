@@ -163,7 +163,7 @@ public:
         }
     }
 
-    bool predict(const std::vector<float> &_input) {
+    auto predict(const std::vector<float> &_input) {
         auto *input = &_input;
         size_t idx = 0;
         for (auto &layer : _layers) {
@@ -173,9 +173,7 @@ public:
         }
 
         const auto &layer = dynamic_cast<RegionLayer &>(*_layers.back());
-        auto locations = layer.get_region_boxes();
-
-        return true;
+        return layer.get_region_boxes();
     }
 
 private:
