@@ -33,7 +33,8 @@ static Box correctScale(const Box &box, size_t imw, size_t imh, size_t netw, siz
 
 bool run_detect(const std::vector<std::string> &args) {
     if (args.size() < 3) {
-	std::cerr << "usage: detect needs at least 3 parameters." << std::endl << std::endl;
+	std::cerr << "usage: detect needs at least 3 parameters.\n"
+                  << "  ex:  ./darknet detect yolo.cfg yolo.weights InputImage.jpg" << std::endl << std::endl;
         return false;
     }
 
