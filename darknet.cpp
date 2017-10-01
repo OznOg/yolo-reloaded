@@ -90,7 +90,7 @@ bool run_detect(const std::vector<std::string> &args) {
     cv::split(letterbox,bgr);
 
     std::vector<float> array;
-    for (ssize_t channel = 2; channel >=0; channel--) {
+    for (ssize_t channel = 0; channel < 3; channel++) {
         cv::Mat &mat = bgr[channel];
         if (mat.isContinuous()) {
             array.insert(array.end(), (float*)mat.datastart, (float*)mat.dataend);
