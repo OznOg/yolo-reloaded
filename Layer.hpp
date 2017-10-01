@@ -12,6 +12,8 @@
 #include <iomanip>
 #include <iterator>
 #include <limits>
+#include <list>
+#include <map>
 
 extern "C" {
 #include "blas.h"
@@ -568,8 +570,37 @@ public:
         return b;
     }
 
+    static auto consolidatePredictions(std::list<Prediction> predictions) {
+        if (predictions.size() == 1)
+            return predictions; // only one entry, obviously the best one
+
+        const auto &p = predictions.front();
+        for (auto it = std::begin(predictions); it != std::end(predictions); ++it) {
+            if (p.box.matchRatio(it->box) > 0.7) { // they seem to point the same place
+                if (p.prob > it->prob)
+                    it = predictions.erase(it);
+                else {
+                    predictions.erase(std::begin(predictions));
+                    return consolidatePredictions(predictions);
+                }
+            }
+        }
+        return predictions;
+    }
+
+    static auto consolidatePredictions(const std::map<size_t, std::list<Prediction>> &predictions) {
+        std::vector<Prediction> consolidated_predictions;
+
+        for (const auto &v : predictions) {
+            for (const auto &p : consolidatePredictions(v.second))
+                consolidated_predictions.push_back(p);
+        }
+
+        return consolidated_predictions;
+    }
+
     auto get_region_boxes(float thresh) const {
-        std::vector<Prediction> predicitons;
+        std::map<size_t, std::list<Prediction>> predictions;
 
         auto w = _input_fmt.width;
         auto h = _input_fmt.height;
@@ -596,10 +627,10 @@ public:
                     }
                 }
                 if (prediction.prob > thresh) // only keep prediciton which probability is over threshhold
-                    predicitons.push_back(prediction);
+                    predictions[prediction.classIndex].push_back(prediction);
             }
         }
-        return predicitons;
+        return consolidatePredictions(predictions);
     }
 
     const std::vector<float> &forward(const std::vector<float> &input) override {
