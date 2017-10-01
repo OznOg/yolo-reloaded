@@ -2,6 +2,7 @@
 
 #include <exception>
 #include <iostream>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -31,16 +32,32 @@ static Box correctScale(const Box &box, size_t imw, size_t imh, size_t netw, siz
     return b;
 }
 
+static auto readClassNames(const std::string &nameFile) {
+    std::map<size_t, std::string> class2str;
+
+    auto nameStream = std::ifstream(nameFile);
+
+    size_t classIdx = 0;
+    std::string name;
+    while (std::getline(nameStream, name)) {
+        class2str[classIdx] = name;
+        classIdx++;
+    }
+    return class2str;
+}
+
 bool run_detect(const std::vector<std::string> &args) {
-    if (args.size() < 3) {
-	std::cerr << "usage: detect needs at least 3 parameters.\n"
-                  << "  ex:  ./darknet detect yolo.cfg yolo.weights InputImage.jpg" << std::endl << std::endl;
+    if (args.size() != 4) {
+	std::cerr << "usage: detect needs at least 4 parameters.\n"
+                  << "  ex:  ./darknet detect coco.names yolo.cfg yolo.weights InputImage.jpg" << std::endl << std::endl;
         return false;
     }
 
-    auto net = NetworkFactory().createFromFile(args[0]);
+    auto net = NetworkFactory().createFromFile(args[1]);
 
-    auto weightsFile = std::ifstream(args[1]);
+    auto class2name = readClassNames(args[0]);
+
+    auto weightsFile = std::ifstream(args[2]);
 
     if (!weightsFile)
         return false;
@@ -49,7 +66,7 @@ bool run_detect(const std::vector<std::string> &args) {
     // FIXME not implemented yet... not sure what it is needed for...
     // net->set_batch_network(1);
 
-    std::string file_name = args[2];
+    std::string file_name = args[3];
     cv::Mat imageInteger = cv::imread(file_name);
     if (imageInteger.empty()) {
         std::cerr << "Could not load image '" << file_name << "'\n";
@@ -105,7 +122,8 @@ bool run_detect(const std::vector<std::string> &args) {
 
     for (const auto &p : predictions) {
         if (p.prob > 0.6) {
-            std::cout << p.prob << " box @" << p.box.x << " " << p.box.y << " class=" << p.classIndex << std::endl;
+            std::cout << p.prob << " box @" << p.box.x << " " << p.box.y << " class="
+                      << class2name[p.classIndex] << std::endl;
             const Box &b = correctScale(p.box, imageInteger.cols, imageInteger.rows, net->_input_size.width, net->_input_size.height);
 
             int left  = (b.x - b.w / 2.) * imageInteger.cols;
@@ -113,6 +131,8 @@ bool run_detect(const std::vector<std::string> &args) {
             int top   = (b.y - b.h / 2.) * imageInteger.rows;
             int bot   = (b.y + b.h / 2.) * imageInteger.rows;
 
+            cv::putText(imageInteger, class2name[p.classIndex], cv::Point(left, top),
+                        cv::FONT_HERSHEY_COMPLEX, 1, cv::Scalar(55, 55, 55), 2);
             cv::rectangle(imageInteger, cv::Point(left, top), cv::Point(right, bot), cv::Scalar(55, 55, 55), 2);
         }
     }
