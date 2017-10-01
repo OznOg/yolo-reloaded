@@ -130,9 +130,10 @@ bool run_detect(const std::vector<std::string> &args) {
         int top   = (b.y - b.h / 2.) * imageInteger.rows;
         int bot   = (b.y + b.h / 2.) * imageInteger.rows;
 
+        cv::Scalar color(b.h * 155, b.y * 155, b.x * 155);
         cv::putText(imageInteger, class2name[p.classIndex], cv::Point(left, top),
-                    cv::FONT_HERSHEY_COMPLEX, 1, cv::Scalar(55, 55, 55), 2);
-        cv::rectangle(imageInteger, cv::Point(left, top), cv::Point(right, bot), cv::Scalar(55, 55, 55), 2);
+                    cv::FONT_HERSHEY_COMPLEX, 1, color, 2);
+        cv::rectangle(imageInteger, cv::Point(left, top), cv::Point(right, bot), color, 2);
     }
     cv::imshow("Predictions", imageInteger);
     cv::waitKey();
