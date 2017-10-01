@@ -46,6 +46,29 @@ static auto readClassNames(const std::string &nameFile) {
     return class2str;
 }
 
+void drawDetection(cv::Mat& im, const std::string &label, const Box &box)
+{
+    int left  = (box.x - box.w / 2.) * im.cols;
+    int right = (box.x + box.w / 2.) * im.cols;
+    int top   = (box.y - box.h / 2.) * im.rows;
+    int bot   = (box.y + box.h / 2.) * im.rows;
+
+    const cv::Scalar color(box.h * 155, box.y * 155, box.x * 155);
+
+    const int font = cv::FONT_HERSHEY_COMPLEX;
+    const double scale = 1;
+    const int thickness = 1;
+    int baseline;
+
+    cv::Size text = cv::getTextSize(label, font, scale, thickness, &baseline);
+
+    cv::rectangle(im, cv::Point(left, top + baseline), cv::Point(left, top) + cv::Point(text.width, -text.height), color, CV_FILLED);
+
+    cv::rectangle(im, cv::Point(left, top), cv::Point(right, bot), color, 2);
+
+    cv::putText(im, label, cv::Point(left, top), font, 1, cv::Scalar(0, 0, 0), 2);
+}
+
 bool run_detect(const std::vector<std::string> &args) {
     if (args.size() != 4) {
 	std::cerr << "usage: detect needs at least 4 parameters.\n"
@@ -124,16 +147,7 @@ bool run_detect(const std::vector<std::string> &args) {
         std::cout << p.prob << " box @" << p.box.x << " " << p.box.y << " class="
                   << class2name[p.classIndex] << std::endl;
         const Box &b = correctScale(p.box, imageInteger.cols, imageInteger.rows, net->_input_size.width, net->_input_size.height);
-
-        int left  = (b.x - b.w / 2.) * imageInteger.cols;
-        int right = (b.x + b.w / 2.) * imageInteger.cols;
-        int top   = (b.y - b.h / 2.) * imageInteger.rows;
-        int bot   = (b.y + b.h / 2.) * imageInteger.rows;
-
-        cv::Scalar color(b.h * 155, b.y * 155, b.x * 155);
-        cv::putText(imageInteger, class2name[p.classIndex], cv::Point(left, top),
-                    cv::FONT_HERSHEY_COMPLEX, 1, color, 2);
-        cv::rectangle(imageInteger, cv::Point(left, top), cv::Point(right, bot), color, 2);
+        drawDetection(imageInteger, class2name[p.classIndex], b);
     }
     cv::imshow("Predictions", imageInteger);
     cv::waitKey();
