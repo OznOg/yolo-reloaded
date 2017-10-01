@@ -568,7 +568,7 @@ public:
         return b;
     }
 
-    auto get_region_boxes() const {
+    auto get_region_boxes(float thresh) const {
         std::vector<Prediction> predicitons;
 
         auto w = _input_fmt.width;
@@ -595,7 +595,8 @@ public:
                         prediction.prob       = prob;
                     }
                 }
-                predicitons.push_back(prediction);
+                if (prediction.prob > thresh) // only keep prediciton which probability is over threshhold
+                    predicitons.push_back(prediction);
             }
         }
         return predicitons;

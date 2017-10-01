@@ -118,23 +118,21 @@ bool run_detect(const std::vector<std::string> &args) {
         }
     }
 
-    auto predictions = net->predict(array);
+    auto predictions = net->predict(array, 0.6 /* FIXME threshold hardcoded */);
 
     for (const auto &p : predictions) {
-        if (p.prob > 0.6) {
-            std::cout << p.prob << " box @" << p.box.x << " " << p.box.y << " class="
-                      << class2name[p.classIndex] << std::endl;
-            const Box &b = correctScale(p.box, imageInteger.cols, imageInteger.rows, net->_input_size.width, net->_input_size.height);
+        std::cout << p.prob << " box @" << p.box.x << " " << p.box.y << " class="
+                  << class2name[p.classIndex] << std::endl;
+        const Box &b = correctScale(p.box, imageInteger.cols, imageInteger.rows, net->_input_size.width, net->_input_size.height);
 
-            int left  = (b.x - b.w / 2.) * imageInteger.cols;
-            int right = (b.x + b.w / 2.) * imageInteger.cols;
-            int top   = (b.y - b.h / 2.) * imageInteger.rows;
-            int bot   = (b.y + b.h / 2.) * imageInteger.rows;
+        int left  = (b.x - b.w / 2.) * imageInteger.cols;
+        int right = (b.x + b.w / 2.) * imageInteger.cols;
+        int top   = (b.y - b.h / 2.) * imageInteger.rows;
+        int bot   = (b.y + b.h / 2.) * imageInteger.rows;
 
-            cv::putText(imageInteger, class2name[p.classIndex], cv::Point(left, top),
-                        cv::FONT_HERSHEY_COMPLEX, 1, cv::Scalar(55, 55, 55), 2);
-            cv::rectangle(imageInteger, cv::Point(left, top), cv::Point(right, bot), cv::Scalar(55, 55, 55), 2);
-        }
+        cv::putText(imageInteger, class2name[p.classIndex], cv::Point(left, top),
+                    cv::FONT_HERSHEY_COMPLEX, 1, cv::Scalar(55, 55, 55), 2);
+        cv::rectangle(imageInteger, cv::Point(left, top), cv::Point(right, bot), cv::Scalar(55, 55, 55), 2);
     }
     cv::imshow("Predictions", imageInteger);
     cv::waitKey();

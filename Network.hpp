@@ -163,7 +163,7 @@ public:
         }
     }
 
-    auto predict(const std::vector<float> &_input) {
+    auto predict(const std::vector<float> &_input, float thresh) {
         auto *input = &_input;
         size_t idx = 0;
         for (auto &layer : _layers) {
@@ -173,7 +173,7 @@ public:
         }
 
         const auto &layer = dynamic_cast<RegionLayer &>(*_layers.back());
-        return layer.get_region_boxes();
+        return layer.get_region_boxes(thresh);
     }
 
 private:
