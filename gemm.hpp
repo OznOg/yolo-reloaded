@@ -27,11 +27,12 @@ static inline void gemm_cpu(size_t M, size_t N, size_t K, float ALPHA,
 			    const float *__restrict__ B, int ldb, float BETA,
 			    float *__restrict__ C, int ldc)
 {
-    for (size_t i = 0; i < M; ++i) {
-        for (size_t j = 0; j < N; ++j) {
-            C[i*ldc + j] *= BETA;
+    if (BETA != 1)
+        for (size_t i = 0; i < M; ++i) {
+            for (size_t j = 0; j < N; ++j) {
+                C[i*ldc + j] *= BETA;
+            }
         }
-    }
     if (not transpose_A and not transpose_B)
         gemm_nn(M, N, K, ALPHA,A,lda, B, ldb,C,ldc);
     else if (transpose_A and not transpose_B)
