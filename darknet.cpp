@@ -112,12 +112,17 @@ bool run_detect(const std::vector<std::string> &args) {
     cv::resize(imageFloat, resized, cv::Size(0, 0), min, min);
 
     cv::Mat letterbox(cv::Size(net->_input_size.width, net->_input_size.height), resized.type());
-    size_t distance_to_top  = (letterbox.rows - resized.rows) / 2;
-    size_t distance_to_side = (letterbox.cols - resized.cols) / 2;
+    size_t distance_to_top    = (letterbox.rows - resized.rows) / 2;
+    size_t distance_to_left   = (letterbox.cols - resized.cols) / 2;
+    // Careful, their might be cases when distance_to_top != distance_to_bottom as
+    // the (letterbox.rows - resized.rows) might be an odd number. Idem for
+    // distance to bottom
+    size_t distance_to_bottom = net->_input_size.height - resized.rows - distance_to_top;
+    size_t distance_to_right  = net->_input_size.width - resized.cols - distance_to_left;
 
     // resized image is copied into a network expected size, adding grey borders
-    copyMakeBorder(resized, letterbox, distance_to_top, distance_to_top,
-                   distance_to_side, distance_to_side,
+    copyMakeBorder(resized, letterbox, distance_to_top, distance_to_bottom,
+                   distance_to_left, distance_to_right,
                    cv::BORDER_CONSTANT, cv::Scalar(0.5, 0.5, 0.5));
 
     // FIXME the predict function expects channels to be separated (full image
