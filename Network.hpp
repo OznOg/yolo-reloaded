@@ -164,6 +164,10 @@ public:
     }
 
     auto predict(const std::vector<float> &_input, float thresh) {
+        if (_input.size() != _input_size.height * _input_size.width * _channels) {
+            throw std::invalid_argument("Actual input size does not match netork size");
+        }
+
         auto *input = &_input;
         size_t idx = 0;
         for (auto &layer : _layers) {
