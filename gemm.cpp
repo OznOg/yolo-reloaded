@@ -5,7 +5,7 @@ void gemm_nn(size_t M, size_t N, size_t K, float ALPHA,
              const float *__restrict__ B, int ldb,
              float *__restrict__ C, int ldc) {
 #if defined(_OPENMP)
-    #pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(static)
 #endif
     for (size_t i = 0; i < M; ++i) {
         for (size_t k = 0; k < K; ++k) {
@@ -22,7 +22,7 @@ void gemm_nt(size_t M, size_t N, size_t K, float ALPHA,
              const float *__restrict__ B, int ldb,
              float *__restrict__ C, int ldc) {
 #if defined(_OPENMP)
-    #pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(static)
 #endif
     for (size_t i = 0; i < M; ++i) {
         for (size_t j = 0; j < N; ++j) {
@@ -40,7 +40,7 @@ void gemm_tn(size_t M, size_t N, size_t K, float ALPHA,
              const float *__restrict__ B, int ldb,
              float *__restrict__ C, int ldc) {
 #if defined(_OPENMP)
-    #pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(static)
 #endif
     for (size_t i = 0; i < M; ++i) {
         for (size_t k = 0; k < K; ++k) {
@@ -57,7 +57,7 @@ void gemm_tt(size_t M, size_t N, size_t K, float ALPHA,
              const float *__restrict__ B, int ldb,
              float *__restrict__ C, int ldc) {
 #if defined(_OPENMP)
-    #pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(static)
 #endif
     for (size_t i = 0; i < M; ++i) {
         for (size_t j = 0; j < N; ++j) {
