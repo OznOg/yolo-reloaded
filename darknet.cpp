@@ -149,8 +149,8 @@ bool run_detect(const std::vector<std::string> &args) {
     auto predictions = net->predict(array, 0.6 /* FIXME threshold hardcoded */);
 
     for (const auto &p : predictions) {
-        std::cout << p.prob << " box @" << p.box.x << " " << p.box.y << " class="
-                  << class2name[p.classIndex] << std::endl;
+        std::cout << "box @ x=" << p.box.x << " y=" << p.box.y << " h=" << p.box.h << " w=" << p.box.w << " probability=" << p.prob << " class="
+                  << class2name[p.classIndex] << "(" << p.classIndex << ")" << std::endl;
         const Box &b = correctScale(p.box, imageInteger.cols, imageInteger.rows, net->_input_size.width, net->_input_size.height);
         drawDetection(imageInteger, class2name[p.classIndex], b);
     }
