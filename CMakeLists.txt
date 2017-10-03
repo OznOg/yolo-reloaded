@@ -28,9 +28,9 @@ SET_TARGET_PROPERTIES(gemm PROPERTIES COMPILE_FLAGS "-O4 -fopenmp")
 add_executable(darknet darknet.cpp NetworkFactory.cpp blas.c)
 target_link_libraries(darknet ${OpenCV_LIBS} gemm)
 
-add_executable(test test.cpp blas.c)
-target_link_libraries(test gemm ${GTEST_BOTH_LIBRARIES})
-SET_TARGET_PROPERTIES(test PROPERTIES COMPILE_FLAGS "-O0 -ggdb")
+add_executable(tests test.cpp utPrediction.cpp blas.c)
+target_link_libraries(tests gemm ${GTEST_BOTH_LIBRARIES})
+SET_TARGET_PROPERTIES(tests PROPERTIES COMPILE_FLAGS "-O0 -ggdb")
 
-add_test(AllTests test)
+add_test(AllTests tests)
 

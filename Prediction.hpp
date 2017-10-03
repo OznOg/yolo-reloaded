@@ -11,6 +11,10 @@ struct Box {
     float matchRatio(const Box &b) const {
         return operator&(b) / operator|(b);
     }
+
+    Box(float X, float Y, float W, float H) : x(X), y(Y), w(W), h(H) {}
+    Box() : x(0), y(0), w(0), h(0) {}
+
 private:
     static inline float overlap(float x1, float w1, float x2, float w2) {
         float l1 = x1 - w1/2;
