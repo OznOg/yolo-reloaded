@@ -174,13 +174,15 @@ static std::unique_ptr<Network> makeNetwork(const ConfigHunk &config) {
     net->_channels          = config.getScalar<size_t>("channels").value();
     net->_momentum          = config.getScalar<float>("momentum").value();
     net->_decay             = config.getScalar<float>("decay").value();
-    net->_angle             = config.getScalar<float>("angle").value();
+    net->_angle             = config.getScalar<float>("angle").value_or(0);
     net->_saturation        = config.getScalar<float>("saturation").value();
     net->_exposure          = config.getScalar<float>("exposure").value();
     net->_hue               = config.getScalar<float>("hue").value();
     net->_learning_rate     = config.getScalar<float>("learning_rate").value();
     net->_burn_in           = config.getScalar<size_t>("burn_in").value_or(0);
     net->_max_batches       = config.getScalar<size_t>("max_batches").value();
+
+    net->_batch /= net->_subdivisions;
 
     net->setPolicy(makePolicy(config));
     return net;
