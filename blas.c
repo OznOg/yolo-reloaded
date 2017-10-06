@@ -6,20 +6,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-void reorg_cpu(const float *x, int w, int h, int c, int batch, int stride, int forward, float *out)
+void reorg_cpu(const float *__restrict__ x, int w, int h, int c, int batch, int stride, int forward, float *__restrict__ out)
 {
     int b,i,j,k;
     int out_c = c/(stride*stride);
 
     for(b = 0; b < batch; ++b){
+#pragma omp parallel for schedule(static)
         for(k = 0; k < c; ++k){
+            int c2 = k % out_c;
+            int offset = k / out_c;
             for(j = 0; j < h; ++j){
+                int h2 = j*stride + offset / stride;
                 for(i = 0; i < w; ++i){
                     int in_index  = i + w*(j + h*(k + c*b));
-                    int c2 = k % out_c;
-                    int offset = k / out_c;
                     int w2 = i*stride + offset % stride;
-                    int h2 = j*stride + offset / stride;
                     int out_index = w2 + w*stride*(h2 + h*stride*(c2 + out_c*b));
                     if(forward) out[out_index] = x[in_index];
                     else out[in_index] = x[out_index];
@@ -123,14 +124,19 @@ void variance_cpu(float *x, float *mean, int batch, int filters, int spatial, fl
     }
 }
 
-void normalize_cpu(float *x, float *mean, float *variance, int batch, int filters, int spatial)
+void normalize_cpu(float *__restrict__ x, const float *__restrict__ mean, const float *__restrict__ variance, int batch, int filters, int spatial)
 {
-    int b, f, i;
-    for(b = 0; b < batch; ++b){
-        for(f = 0; f < filters; ++f){
-            for(i = 0; i < spatial; ++i){
-                int index = b*filters*spatial + f*spatial + i;
-                x[index] = (x[index] - mean[f])/(sqrt(variance[f]) + .000001f);
+    for(int b = 0; b < batch; ++b){
+	int b_size = b * filters * spatial;
+#pragma omp parallel for schedule(static)
+        for(int f = 0; f < filters; ++f){
+	    int f_size = b_size + f * spatial;
+            //FIXME the sqrt(variance[f]) could be computed before instead of everytime we get here... 
+	    float sqrt_variance_f = (sqrt(variance[f]) + .000001f);
+	    float mean_f = mean[f];
+            for(int i = 0; i < spatial; ++i){
+                int index = f_size + i;
+                x[index] = (x[index] - mean_f) / sqrt_variance_f;
             }
         }
     }
@@ -259,31 +265,39 @@ float dot_cpu(int N, float *X, int INCX, float *Y, int INCY)
     return dot;
 }
 
-void softmax(const float *input, int n, float temp, int stride, float *output)
+static inline void softmax(const float *__restrict__ input, unsigned int n, float temp, int stride, float *__restrict__ output)
 {
-    int i;
+#pragma omp parallel
+{
     float sum = 0;
     float largest = -FLT_MAX;
-    for(i = 0; i < n; ++i){
-        if(input[i*stride] > largest) largest = input[i*stride];
+    for (size_t i = 0; i < n * stride; i += stride) {
+        if (input[i] > largest)
+	    largest = input[i];
     }
-    for(i = 0; i < n; ++i){
-        float e = exp(input[i*stride]/temp - largest/temp);
-        sum += e;
-        output[i*stride] = e;
+#pragma omp for schedule(static)
+    for (size_t i = 0; i < n * stride; i += stride) {
+        output[i] = exp((input[i] - largest) / temp);
     }
-    for(i = 0; i < n; ++i){
-        output[i*stride] /= sum;
+#pragma omp for schedule(static)
+    for (size_t i = 0; i < n * stride; i += stride){
+#pragma omp atomic
+        sum += output[i];
     }
+#pragma omp for schedule(static)
+    for (size_t i = 0; i < n; ++i){
+        output[i * stride] /= sum;
+    }
+}
 }
 
 
-void softmax_cpu(const float *input, int n, int batch, int batch_offset, int groups, int group_offset, int stride, float temp, float *output)
+void softmax_cpu(const float *__restrict__ input, unsigned int n, unsigned int batch, int batch_offset, unsigned int groups, int group_offset, int stride, float temp, float *__restrict__ output)
 {
-    int g, b;
-    for(b = 0; b < batch; ++b){
-        for(g = 0; g < groups; ++g){
-            softmax(input + b*batch_offset + g*group_offset, n, temp, stride, output + b*batch_offset + g*group_offset);
+    for (size_t b = 0; b < batch; ++b){
+        for (size_t g = 0; g < groups; ++g){
+            size_t idx = b * batch_offset + g * group_offset;
+            softmax(input + idx, n, temp, stride, output + idx);
         }
     }
 }
