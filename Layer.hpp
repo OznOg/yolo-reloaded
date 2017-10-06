@@ -371,13 +371,15 @@ public:
                                 ssize_t cur_h = h_offset + i*_stride + n;
                                 ssize_t cur_w = w_offset + j*_stride + m;
 
-                                int index = cur_w + _input_fmt.width * (cur_h + _input_fmt.height * (k + b * _input_fmt.channels));
                                 int valid = (cur_h >= 0 && cur_h < (ssize_t)_input_fmt.height
                                           && cur_w >= 0 && cur_w < (ssize_t)_input_fmt.width);
 
-                                float val = valid ? input[index] : std::numeric_limits<float>::lowest();
-                                max_i = (val > max) ? index : max_i;
-                                max   = std::max(val, max);
+                                if (valid) {
+                                    int index = cur_w + _input_fmt.width * (cur_h + _input_fmt.height * (k + b * _input_fmt.channels));
+                                    float val = input[index];
+                                    max_i = (val > max) ? index : max_i;
+                                    max   = std::max(val, max);
+                                }
                             }
                         }
                         _output._data[out_index] = max;
