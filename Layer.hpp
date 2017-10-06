@@ -212,7 +212,7 @@ public:
     //https://github.com/BVLC/caffe/blob/master/LICENSE
     void im2col_cpu(const std::vector<float> &data_im,
             int channels,  int height,  int width,
-            int ksize,  int stride, int pad, std::vector<float> &data_col)
+            int ksize,  int stride, int pad, float *data_col)
     {
         int height_col = (height + 2*pad - ksize) / stride + 1;
         int width_col =  (width  + 2*pad - ksize) / stride + 1;
@@ -268,21 +268,20 @@ public:
 
     const std::vector<float> &forward(const std::vector<float> &input) override {
 
-        std::vector<float> temp;
-        temp.reserve(_input_fmt.width * _input_fmt.height * (_input_fmt.channels * _size * _size /* ksize */));
-
-        im2col_cpu(input, _input_fmt.channels, _input_fmt.height, _input_fmt.width, _size, _stride, _padding, temp);
-
         int m = _filters;
         int k = _input_fmt.channels * _size * _size;
         int n = _output._format.width * _output._format.height;;
 
+        float *temp = new float[n * k];
+
+        im2col_cpu(input, _input_fmt.channels, _input_fmt.height, _input_fmt.width, _size, _stride, _padding, temp);
 
         float *a = &_weights[0];
         float *b = &temp[0];
         float *c = &_output._data[0];
 
         gemm<false, false>(m, n, k, 1, a, k, b, n, 1, c, n);
+        delete[] temp;
 
         if (_batch_normalize) {
             _x = _output._data;
