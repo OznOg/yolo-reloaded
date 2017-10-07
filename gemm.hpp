@@ -43,6 +43,19 @@ static inline void gemm_cpu(size_t M, size_t N, size_t K, float ALPHA,
         gemm_tt(M, N, K, ALPHA,A,lda, B, ldb,C,ldc);
 }
 
+/*    <---- K ---->  <---- N ---->           <---- N ---->
+ * ^  /          \    /         \   ^     ^   /          \
+ * | |            |  |           |  |     |  |            |
+ * | |            |  |  Matrix B |  K     |  |            |
+ * M |   Matrix A |  |           |  |     M  |  Matrix C  |
+ * | |            |   \         /   V     |  |            |
+ * | |            |                       |  |            |
+ * V  \          /                        V   \          /
+ *
+ *    Result is
+ *               C = α A * B + β C
+ */
+
 template <bool transpose_A, bool transpose_B>
 void gemm(size_t M, size_t N, size_t K, float ALPHA,
           const float *__restrict__ A, int lda, 
