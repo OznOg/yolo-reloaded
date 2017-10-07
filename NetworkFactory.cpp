@@ -213,6 +213,31 @@ static std::unique_ptr<Layer> makeLayer(const ConfigHunk &config) {
 	size_t padding = config.getScalar<size_t>("padding").value_or((size - 1) / 2);
 
 	return std::unique_ptr<Layer>(new MaxpoolLayer(size, stride, padding));
+    } else if (layer_name == "detection") {
+        auto coords  = config.getScalar<size_t>("coords").value_or(1);
+        auto classes = config.getScalar<size_t>("classes").value_or(1);
+        auto num     = config.getScalar<size_t>("num").value_or(1);
+        auto side    = config.getScalar<size_t>("side").value_or(7);
+        auto softmax = config.getScalar<bool>("softmax").value_or(false);
+
+#if 0
+//FIXME not used (necessary?) yet
+        layer.sqrt = option_find_int(options, "sqrt", 0);
+
+        layer.max_boxes = option_find_int_quiet(options, "max",30);
+        layer.coord_scale = option_find_float(options, "coord_scale", 1);
+        layer.forced = option_find_int(options, "forced", 0);
+        layer.object_scale = option_find_float(options, "object_scale", 1);
+        layer.noobject_scale = option_find_float(options, "noobject_scale", 1);
+        layer.class_scale = option_find_float(options, "class_scale", 1);
+        layer.jitter = option_find_float(options, "jitter", .2);
+        layer.random = option_find_int_quiet(options, "random", 0);
+        layer.reorg = option_find_int_quiet(options, "reorg", 0);
+#endif
+
+        auto layer = new DetectionLayer(num, classes, coords, side, softmax);
+        return std::unique_ptr<Layer>(layer);
+
     } else if (layer_name == "region") {
         int coords = config.getScalar<int>("coords").value_or(4);
         int classes = config.getScalar<int>("classes").value_or(20);

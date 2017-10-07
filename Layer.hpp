@@ -574,6 +574,49 @@ private:
     bool _extra;
 };
 
+class DetectionLayer : public Layer {
+public:
+    DetectionLayer (size_t num, int classes, int coords, size_t side, bool softmax) : _num(num), _classes(classes), _coords(coords), _side(side), _softmax(softmax) {}
+
+    void setInputFormat(const Format &format) override {
+        _input_fmt = Format(_side, _side, _classes + _num * (_coords + 1), format.batch);
+
+        _output = LayerData(_input_fmt);
+    }
+
+    std::string getName() const override {
+        return "Detection";
+    }
+
+    void loadWeights(std::istream &in) override {
+        (void)in;
+    }
+
+    const std::vector<float> &forward(const std::vector<float> &input) override {
+        size_t locations = _side * _side;
+
+        _output._data = input;
+
+        if (_softmax) {
+            for (size_t b = 0; b < _input_fmt.batch; ++b) {
+                size_t index = b * input.size();
+                for (size_t offset = 0; offset < locations * _classes; offset += _classes) {
+                    softmax(&input[index + offset], _classes, 1, 1,
+                            &_output._data[index + offset]);
+                }
+            }
+        }
+        return _output._data;
+    }
+
+private:
+    size_t _num;
+    size_t _classes;
+    int    _coords;
+    size_t _side;
+    bool   _softmax;
+};
+
 class RegionLayer : public Layer {
 public:
     RegionLayer(size_t num, int classes, int coords, size_t side, bool softmax, bool background, const std::vector<float> &biases) :
@@ -590,7 +633,7 @@ public:
     }
 
     std::string getName() const override {
-        return "Detection";
+        return "Region";
     }
 
     void loadWeights(std::istream &in) override {

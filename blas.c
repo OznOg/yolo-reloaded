@@ -265,7 +265,7 @@ float dot_cpu(int N, float *X, int INCX, float *Y, int INCY)
     return dot;
 }
 
-static inline void softmax(const float *__restrict__ input, unsigned int n, float temp, int stride, float *__restrict__ output)
+void softmax(const float *__restrict__ input, unsigned int n, float temp, int stride, float *__restrict__ output)
 {
 #pragma omp parallel
 {

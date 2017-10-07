@@ -22,5 +22,5 @@ void smooth_l1_cpu(int n, float *pred, float *truth, float *delta, float *error)
 void l1_cpu(int n, float *pred, float *truth, float *delta, float *error);
 void l2_cpu(int n, float *pred, float *truth, float *delta, float *error);
 float dot_cpu(int N, float *X, int INCX, float *Y, int INCY);
-//void softmax(const float *__restrict__ input, unsigned int n, float temp, int stride, float *__restrict__ output);
+void softmax(const float *__restrict__ input, unsigned int n, float temp, int stride, float *__restrict__ output);
 void softmax_cpu(const float *__restrict__ input, unsigned int n, unsigned int batch, int batch_offset, unsigned int groups, int group_offset, int stride, float temp, float *__restrict__ output);
