@@ -201,6 +201,12 @@ static std::unique_ptr<Layer> makeLayer(const ConfigHunk &config) {
 	Activation activation  = activationFromString(config.getScalar<std::string>("activation").value());
 
 	return std::unique_ptr<Layer>(new ConvolutionalLayer(batch_normalize, filters, size, stride, padding, activation));
+    } else if (layer_name == "connected") {
+	bool batch_normalize   = config.getScalar<bool>("batch_normalize").value_or(false);
+	size_t outputs         = config.getScalar<size_t>("output").value();
+	Activation activation  = activationFromString(config.getScalar<std::string>("activation").value());
+
+	return std::unique_ptr<Layer>(new ConnectedLayer(batch_normalize, outputs, activation));
     } else if (layer_name == "maxpool") {
 	size_t stride          = config.getScalar<size_t>("stride").value();
 	size_t size            = config.getScalar<size_t>("size").value();

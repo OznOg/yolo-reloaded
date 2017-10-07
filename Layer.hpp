@@ -145,6 +145,63 @@ static inline void activate_array(Activation a, float *x, size_t n) {
     }
 }
 
+static inline void add_bias(float *output, const float *biases, int batch, int n, int size)
+{
+    int i,j,b;
+    for(b = 0; b < batch; ++b){
+        for(i = 0; i < n; ++i){
+            for(j = 0; j < size; ++j){
+                output[(b*n + i)*size + j] += biases[i];
+            }
+        }
+    }
+}
+
+class ConnectedLayer : public Layer {
+public:
+    ConnectedLayer(bool batch_normalize, size_t outputs, Activation activation) :
+         _batch_normalize(batch_normalize), _activation(activation), _weights(outputs) { }
+
+    void setInputFormat(const Format &format) override {
+	_input_fmt = Format(1, 1, format.width * format.height * format.channels, format.batch);
+
+        _output = LayerData(Format(1, 1, _weights.size(), format.batch));
+    }
+
+    std::string getName() const override {
+        return "Connected";
+    }
+
+    void loadWeights(std::istream &in) override {
+        (void)in;
+    }
+
+    const std::vector<float> &forward(const std::vector<float> &input) override {
+
+        int m = _input_fmt.batch;
+        int k = _input_fmt.channels * _input_fmt.height * _input_fmt.width;
+        int n = _weights.size();
+        const float *a = &input[0];
+        const float *b = &_weights[0];
+        float *c = &_output._data[0];
+        gemm<false, true>(m, n, k, 1, a, k, b, k, 1, c, n);
+
+        if (_batch_normalize) {
+            //normalize_cpu(c, &_rolling_mean[0], &_rolling_variance[0], _output._format.batch, _output._format.channels, n);
+            //scale_bias(c, &_scales[0], _output._format.batch, _output._format.channels, n);
+        }
+        //add_bias(c, _biases, m, n, 1);
+
+        activate_array(_activation, &_output._data[0], _output._data.size());
+
+        return _output._data;
+    }
+private:
+    bool _batch_normalize;
+    Activation _activation = Activation::Leaky;
+    std::vector<float> _weights;
+};
+
 class ConvolutionalLayer : public Layer {
 public:
     ConvolutionalLayer(bool batch_normalize, size_t filters,
@@ -237,18 +294,6 @@ public:
 
                     data_col[col_index] = im2col_get_pixel(data_im, height, width, channels,
                             im_row, im_col, c_im, pad);
-                }
-            }
-        }
-    }
-
-    void add_bias(float *output, const float *biases, int batch, int n, int size)
-    {
-        int i,j,b;
-        for(b = 0; b < batch; ++b){
-            for(i = 0; i < n; ++i){
-                for(j = 0; j < size; ++j){
-                    output[(b*n + i)*size + j] += biases[i];
                 }
             }
         }
