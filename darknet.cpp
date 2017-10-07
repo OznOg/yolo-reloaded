@@ -69,12 +69,23 @@ void drawDetection(cv::Mat& im, const std::string &label, const Box &box)
     cv::putText(im, label, cv::Point(left, top), font, 1, cv::Scalar(0, 0, 0), 2);
 }
 
-bool run_detect(const std::vector<std::string> &args) {
-    if (args.size() != 4) {
+bool run_detect(const std::vector<std::string> &_args) {
+    auto args = _args;
+
+    if (args.size() < 4) {
 	std::cerr << "usage: detect needs at least 4 parameters.\n"
-                  << "  ex:  ./darknet detect coco.names yolo.cfg yolo.weights InputImage.jpg" << std::endl << std::endl;
+                  << "  ex:  ./darknet detect [--thresh=percentage] coco.names yolo.cfg yolo.weights InputImage.jpg" << std::endl << std::endl;
         return false;
     }
+
+    float threshold = 0.3;
+    if (std::string(args[0].substr(0, 9)) == "--thresh=") {
+        try {
+            threshold = std::stoul(args[0].substr(9, std::string::npos)) / 100.;
+        } catch (...) { }
+        args.erase(args.begin()); // remove threshold switch from list of options
+    }
+    std::cout << "Using threshold=" << threshold * 100 << "%" << std::endl;
 
     auto net = NetworkFactory().createFromFile(args[1], false);
 
@@ -143,7 +154,7 @@ bool run_detect(const std::vector<std::string> &args) {
         }
     }
 
-    auto predictions = net->predict(array, 0.6 /* FIXME threshold hardcoded */);
+    auto predictions = net->predict(array, threshold);
 
     for (const auto &p : predictions) {
         std::cout << "box @ x=" << p.box.x << " y=" << p.box.y << " h=" << p.box.h << " w=" << p.box.w << " probability=" << p.prob << " class="
