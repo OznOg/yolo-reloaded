@@ -1,29 +1,29 @@
 #pragma once
 #include <cstddef>
 
-void gemm_nn(size_t M, size_t N, size_t K, float ALPHA, 
-             const float *__restrict__ A, int lda, 
+void gemm_nn(size_t M, size_t N, size_t K, float ALPHA,
+             const float *__restrict__ A, int lda,
              const float *__restrict__ B, int ldb,
              float *__restrict__ C, int ldc);
 
-void gemm_nt(size_t M, size_t N, size_t K, float ALPHA, 
-             const float *__restrict__ A, int lda, 
+void gemm_nt(size_t M, size_t N, size_t K, float ALPHA,
+             const float *__restrict__ A, int lda,
              const float *__restrict__ B, int ldb,
              float *__restrict__ C, int ldc);
 
-void gemm_tn(size_t M, size_t N, size_t K, float ALPHA, 
-             const float *__restrict__ A, int lda, 
+void gemm_tn(size_t M, size_t N, size_t K, float ALPHA,
+             const float *__restrict__ A, int lda,
              const float *__restrict__ B, int ldb,
              float *__restrict__ C, int ldc);
 
-void gemm_tt(size_t M, size_t N, size_t K, float ALPHA, 
-             const float *__restrict__ A, int lda, 
+void gemm_tt(size_t M, size_t N, size_t K, float ALPHA,
+             const float *__restrict__ A, int lda,
              const float *__restrict__ B, int ldb,
              float *__restrict__ C, int ldc);
 
 template <bool transpose_A, bool transpose_B>
-static inline void gemm_cpu(size_t M, size_t N, size_t K, float ALPHA, 
-                            const float *__restrict__ A, int lda, 
+static inline void gemm_cpu(size_t M, size_t N, size_t K, float ALPHA,
+                            const float *__restrict__ A, int lda,
 			    const float *__restrict__ B, int ldb, float BETA,
 			    float *__restrict__ C, int ldc)
 {
@@ -58,7 +58,7 @@ static inline void gemm_cpu(size_t M, size_t N, size_t K, float ALPHA,
 
 template <bool transpose_A, bool transpose_B>
 void gemm(size_t M, size_t N, size_t K, float ALPHA,
-          const float *__restrict__ A, int lda, 
+          const float *__restrict__ A, int lda,
           const float *__restrict__ B, int ldb, float BETA,
           float *__restrict__ C, int ldc)
 {

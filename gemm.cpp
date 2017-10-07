@@ -1,7 +1,7 @@
 #include "gemm.hpp"
 
-void gemm_nn(size_t M, size_t N, size_t K, float ALPHA, 
-             const float *__restrict__ A, int lda, 
+void gemm_nn(size_t M, size_t N, size_t K, float ALPHA,
+             const float *__restrict__ A, int lda,
              const float *__restrict__ B, int ldb,
              float *__restrict__ C, int ldc) {
 #if defined(_OPENMP)
@@ -17,8 +17,8 @@ void gemm_nn(size_t M, size_t N, size_t K, float ALPHA,
     }
 }
 
-void gemm_nt(size_t M, size_t N, size_t K, float ALPHA, 
-             const float *__restrict__ A, int lda, 
+void gemm_nt(size_t M, size_t N, size_t K, float ALPHA,
+             const float *__restrict__ A, int lda,
              const float *__restrict__ B, int ldb,
              float *__restrict__ C, int ldc) {
 #if defined(_OPENMP)
@@ -35,8 +35,8 @@ void gemm_nt(size_t M, size_t N, size_t K, float ALPHA,
     }
 }
 
-void gemm_tn(size_t M, size_t N, size_t K, float ALPHA, 
-             const float *__restrict__ A, int lda, 
+void gemm_tn(size_t M, size_t N, size_t K, float ALPHA,
+             const float *__restrict__ A, int lda,
              const float *__restrict__ B, int ldb,
              float *__restrict__ C, int ldc) {
 #if defined(_OPENMP)
@@ -52,8 +52,8 @@ void gemm_tn(size_t M, size_t N, size_t K, float ALPHA,
     }
 }
 
-void gemm_tt(size_t M, size_t N, size_t K, float ALPHA, 
-             const float *__restrict__ A, int lda, 
+void gemm_tt(size_t M, size_t N, size_t K, float ALPHA,
+             const float *__restrict__ A, int lda,
              const float *__restrict__ B, int ldb,
              float *__restrict__ C, int ldc) {
 #if defined(_OPENMP)
