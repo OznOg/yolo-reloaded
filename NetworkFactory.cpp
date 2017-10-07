@@ -161,13 +161,12 @@ static std::unique_ptr<Policy> makePolicy(const ConfigHunk &config) {
     return policy;
 }
 
-static std::unique_ptr<Network> makeNetwork(const ConfigHunk &config) {
+static std::unique_ptr<Network> makeNetwork(const ConfigHunk &config, bool training) {
     if (config.getName() != "[net]" && config.getName() != "[network]")
 	throw std::invalid_argument("Inconsistant configuration (network not found at top level)");
 
 
     std::unique_ptr<Network> net(new Network()); 
-    net->_batch             = config.getScalar<int>("batch").value();
     net->_subdivisions      = config.getScalar<size_t>("subdivisions").value();
     net->_input_size.width  = config.getScalar<size_t>("width").value();
     net->_input_size.height = config.getScalar<size_t>("height").value();
@@ -182,7 +181,17 @@ static std::unique_ptr<Network> makeNetwork(const ConfigHunk &config) {
     net->_burn_in           = config.getScalar<size_t>("burn_in").value_or(0);
     net->_max_batches       = config.getScalar<size_t>("max_batches").value();
 
-    net->_batch /= net->_subdivisions;
+    if (training) {
+        net->_batch             = config.getScalar<int>("batch").value();
+        net->_batch /= net->_subdivisions;
+    } else { // Batch value is used only when training, it is forced at 1 when
+             // just running the detector
+             // FIXME The should probably be some different implementation for
+             // training and not training. The bach argument is confusing the code...
+             // Moreover it seems that a lot of parameters are used only for training,
+             // thus this should be heavily reworked...
+        net->_batch = 1;
+    }
 
     net->setPolicy(makePolicy(config));
     return net;
@@ -296,12 +305,12 @@ static inline bool isRouteConfig(const ConfigHunk &config) {
     return config.getName() == "[route]";
 }
 
-std::unique_ptr<Network> NetworkFactory::createFromString(const std::string &content) {
+std::unique_ptr<Network> NetworkFactory::createFromString(const std::string &content, bool training) {
     auto local_copy = content;
 
     //file Content MUST begin with network stuff
     const auto &networkConfig = popConfigHunk(local_copy);
-    auto net = makeNetwork(networkConfig);
+    auto net = makeNetwork(networkConfig, training);
 
     while (!local_copy.empty()) {
 	const auto &config = popConfigHunk(local_copy);
@@ -315,10 +324,10 @@ std::unique_ptr<Network> NetworkFactory::createFromString(const std::string &con
     return net;
 }
 
-std::unique_ptr<Network> NetworkFactory::createFromFile(const std::string &fileName) {
+std::unique_ptr<Network> NetworkFactory::createFromFile(const std::string &fileName, bool training) {
     std::string file_content = getFileContent(fileName);
 
-    return createFromString(file_content);
+    return createFromString(file_content, training);
 }
 
 } // namespace yolo

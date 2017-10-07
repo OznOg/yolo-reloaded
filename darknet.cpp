@@ -76,7 +76,7 @@ bool run_detect(const std::vector<std::string> &args) {
         return false;
     }
 
-    auto net = NetworkFactory().createFromFile(args[1]);
+    auto net = NetworkFactory().createFromFile(args[1], false);
 
     auto class2name = readClassNames(args[0]);
 
@@ -85,9 +85,6 @@ bool run_detect(const std::vector<std::string> &args) {
     if (!weightsFile)
         return false;
     net->loadWeights(weightsFile);
-
-    // FIXME not implemented yet... not sure what it is needed for...
-    // net->set_batch_network(1);
 
     std::string file_name = args[3];
     cv::Mat imageInteger = cv::imread(file_name);

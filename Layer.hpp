@@ -157,15 +157,36 @@ static inline void add_bias(float *output, const float *biases, int batch, int n
     }
 }
 
+static inline void scale_bias(float *output, const float *scales, int batch, int n, int size)
+{
+    int i,j,b;
+    for(b = 0; b < batch; ++b){
+        for(i = 0; i < n; ++i){
+            for(j = 0; j < size; ++j){
+                output[(b*n + i)*size + j] *= scales[i];
+            }
+        }
+    }
+}
+
 class ConnectedLayer : public Layer {
 public:
     ConnectedLayer(bool batch_normalize, size_t outputs, Activation activation) :
-         _batch_normalize(batch_normalize), _activation(activation), _weights(outputs) { }
+         _batch_normalize(batch_normalize), _outputs(outputs), _activation(activation), _weights(), _biases(outputs) { }
 
     void setInputFormat(const Format &format) override {
 	_input_fmt = Format(1, 1, format.width * format.height * format.channels, format.batch);
 
-        _output = LayerData(Format(1, 1, _weights.size(), format.batch));
+        _output = LayerData(Format(1, 1, _outputs, format.batch));
+
+	_weights.resize(_outputs * format.width * format.height * format.channels);
+
+        if (_batch_normalize){
+            _scales.resize(_outputs, 1.);
+            _rolling_mean.resize(_outputs);
+            _rolling_variance.resize(_outputs);
+        }
+
     }
 
     std::string getName() const override {
@@ -173,24 +194,32 @@ public:
     }
 
     void loadWeights(std::istream &in) override {
-        (void)in;
+        in.read((char *)&_biases[0], _biases.size() * sizeof(float));
+        in.read((char *)&_weights[0], _weights.size() * sizeof(float));
+
+        if (_batch_normalize /* FIXME not used yet && (!l.dontloadscales) */ ) {
+            in.read((char *)&_scales[0], _scales.size() * sizeof(float))
+              .read((char *)&_rolling_mean[0], _rolling_mean.size() * sizeof(float))
+              .read((char *)&_rolling_variance[0], _rolling_variance.size() * sizeof(float));
+        }
     }
 
     const std::vector<float> &forward(const std::vector<float> &input) override {
 
         int m = _input_fmt.batch;
         int k = _input_fmt.channels * _input_fmt.height * _input_fmt.width;
-        int n = _weights.size();
+        int n = _outputs;
         const float *a = &input[0];
         const float *b = &_weights[0];
         float *c = &_output._data[0];
+
         gemm<false, true>(m, n, k, 1, a, k, b, k, 1, c, n);
 
         if (_batch_normalize) {
-            //normalize_cpu(c, &_rolling_mean[0], &_rolling_variance[0], _output._format.batch, _output._format.channels, n);
-            //scale_bias(c, &_scales[0], _output._format.batch, _output._format.channels, n);
+            normalize_cpu(c, &_rolling_mean[0], &_rolling_variance[0], _output._format.batch, _output._format.channels, n);
+            scale_bias(c, &_scales[0], _output._format.batch, _output._format.channels, n);
         }
-        //add_bias(c, _biases, m, n, 1);
+        add_bias(c, &_biases[0], m, n, 1);
 
         activate_array(_activation, &_output._data[0], _output._data.size());
 
@@ -198,8 +227,13 @@ public:
     }
 private:
     bool _batch_normalize;
+    size_t _outputs;
     Activation _activation = Activation::Leaky;
     std::vector<float> _weights;
+    std::vector<float> _biases;
+    std::vector<float> _scales;
+    std::vector<float> _rolling_mean;
+    std::vector<float> _rolling_variance;
 };
 
 class ConvolutionalLayer : public Layer {
@@ -294,18 +328,6 @@ public:
 
                     data_col[col_index] = im2col_get_pixel(data_im, height, width, channels,
                             im_row, im_col, c_im, pad);
-                }
-            }
-        }
-    }
-
-    void scale_bias(float *output, const float *scales, int batch, int n, int size)
-    {
-        int i,j,b;
-        for(b = 0; b < batch; ++b){
-            for(i = 0; i < n; ++i){
-                for(j = 0; j < size; ++j){
-                    output[(b*n + i)*size + j] *= scales[i];
                 }
             }
         }
@@ -609,12 +631,48 @@ public:
         return _output._data;
     }
 
+    auto get_boxes(float thresh) const {
+        std::vector<Prediction> predictions;
+
+        const float *data = _output._data.data();
+
+        for (size_t i = 0; i < _side * _side; ++i) {
+            size_t row = i / _side;
+            size_t col = i % _side;
+
+            for (size_t n = 0; n < _num; ++n) {
+                int p_index = _side * _side * _classes + i * _num + n;
+                float scale = data[p_index];
+                int box_index = _side * _side * (_classes + _num) + (i * _num + n) * 4;
+
+                Prediction prediction;
+                prediction.box.x = (data[box_index + 0] + col) / _side;
+                prediction.box.y = (data[box_index + 1] + row) / _side;
+                prediction.box.w = pow(data[box_index + 2], (_sqrt ? 2 : 1));
+                prediction.box.h = pow(data[box_index + 3], (_sqrt ? 2 : 1));
+
+                prediction.prob = 0;
+                for (size_t j = 0; j < _classes; ++j) {
+                    int class_index = i * _classes;
+                    float prob = scale * data[class_index + j];
+                    if (prediction.prob < prob) {
+                        prediction.prob = prob;
+                        prediction.classIndex = j;
+                    }
+                }
+		predictions.push_back(prediction);
+            }
+        }
+        return Prediction::reduce(predictions, thresh);
+    }
+
 private:
     size_t _num;
     size_t _classes;
     int    _coords;
     size_t _side;
     bool   _softmax;
+    bool _sqrt = true;
 };
 
 class RegionLayer : public Layer {

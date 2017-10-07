@@ -176,8 +176,15 @@ public:
             std::cout << " done" << std::endl;
         }
 
-        const auto &layer = dynamic_cast<RegionLayer &>(*_layers.back());
-        return layer.get_region_boxes(thresh);
+        const auto *regionlayer = dynamic_cast<RegionLayer *>(_layers.back().get());
+        if (regionlayer != nullptr)
+            return regionlayer->get_region_boxes(thresh);
+
+        const auto *detectionlayer = dynamic_cast<DetectionLayer *>(_layers.back().get());
+        if (detectionlayer != nullptr)
+            return detectionlayer->get_boxes(thresh);
+
+        throw std::invalid_argument("Dont know which detection type you are using.");
     }
 
 private:
