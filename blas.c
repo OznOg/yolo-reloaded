@@ -8,17 +8,16 @@
 #include <string.h>
 void reorg_cpu(const float *__restrict__ x, int w, int h, int c, int batch, int stride, int forward, float *__restrict__ out)
 {
-    int b,i,j,k;
-    int out_c = c/(stride*stride);
+    int out_c = c / (stride * stride);
 
-    for(b = 0; b < batch; ++b){
+    for(int b = 0; b < batch; ++b){
 #pragma omp parallel for schedule(static)
-        for(k = 0; k < c; ++k){
+        for(int k = 0; k < c; ++k){
             int c2 = k % out_c;
             int offset = k / out_c;
-            for(j = 0; j < h; ++j){
+            for(int j = 0; j < h; ++j){
                 int h2 = j*stride + offset / stride;
-                for(i = 0; i < w; ++i){
+                for(int i = 0; i < w; ++i){
                     int in_index  = i + w*(j + h*(k + c*b));
                     int w2 = i*stride + offset % stride;
                     int out_index = w2 + w*stride*(h2 + h*stride*(c2 + out_c*b));
@@ -267,24 +266,23 @@ float dot_cpu(int N, float *X, int INCX, float *Y, int INCY)
 
 void softmax(const float *__restrict__ input, unsigned int n, float temp, int stride, float *__restrict__ output)
 {
-#pragma omp parallel
-{
     float sum = 0;
     float largest = -FLT_MAX;
+#pragma omp parallel default(none) shared(sum, largest) firstprivate(input, output, n, stride, temp)
+{
+#pragma omp for schedule(static) reduction(max:largest)
     for (size_t i = 0; i < n * stride; i += stride) {
         if (input[i] > largest)
 	    largest = input[i];
     }
-#pragma omp for schedule(static)
+
+#pragma omp for schedule(static) reduction(+:sum)
     for (size_t i = 0; i < n * stride; i += stride) {
         output[i] = exp((input[i] - largest) / temp);
-    }
-#pragma omp for schedule(static)
-    for (size_t i = 0; i < n * stride; i += stride){
-#pragma omp atomic
         sum += output[i];
     }
-#pragma omp for schedule(static)
+
+#pragma omp for schedule(static) nowait
     for (size_t i = 0; i < n; ++i){
         output[i * stride] /= sum;
     }
