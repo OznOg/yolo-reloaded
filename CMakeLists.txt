@@ -5,15 +5,21 @@ project (yolo-reloaded)
 set (yolo-reloaded_VERSION_MAJOR 1)
 set (yolo-reloaded_VERSION_MINOR 0)
 
-set(CMAKE_C_FLAGS "-Wall -Wextra -fopenmp -mavx")
+set(CMAKE_C_FLAGS "-Wall -Wextra -mavx")
 set(CMAKE_C_FLAGS_DEBUG "-O0 -ggdb")
 set(CMAKE_C_FLAGS_RELEASE "-O4")
 
 set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -Werror -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -ggdb")
-set(CMAKE_CXX_FLAGS_RELEASE "-O4 -mavx -fopenmp")
+set(CMAKE_CXX_FLAGS_RELEASE "-O4 -mavx")
 
 find_package(OpenCV REQUIRED)
+
+find_package(OpenMP REQUIRED)
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 
 enable_testing()
 find_package(GTest REQUIRED)
@@ -23,7 +29,7 @@ include_directories(.)
 
 add_library(gemm STATIC gemm.cpp)
 target_link_libraries(gemm -fopenmp)
-SET_TARGET_PROPERTIES(gemm PROPERTIES COMPILE_FLAGS "-O4 -fopenmp -mavx")
+SET_TARGET_PROPERTIES(gemm PROPERTIES COMPILE_FLAGS "-O4 -mavx")
 
 add_executable(darknet darknet.cpp NetworkFactory.cpp blas.c)
 target_link_libraries(darknet ${OpenCV_LIBS} gemm)
