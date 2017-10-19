@@ -27,15 +27,19 @@ include_directories(${GTEST_INCLUDE_DIRS})
 
 include_directories(.)
 
+add_library(gemmcl STATIC libclblas.cpp)
+target_link_libraries(gemmcl /usr/lib64/beignet/libcl.so)
+SET_TARGET_PROPERTIES(gemmcl PROPERTIES COMPILE_FLAGS "-O4 -mavx -Wno-deprecated-declarations")
+
 add_library(gemm STATIC gemm.cpp)
 target_link_libraries(gemm -fopenmp)
 SET_TARGET_PROPERTIES(gemm PROPERTIES COMPILE_FLAGS "-O4 -mavx")
 
 add_executable(darknet darknet.cpp NetworkFactory.cpp blas.c)
-target_link_libraries(darknet ${OpenCV_LIBS} gemm)
+target_link_libraries(darknet ${OpenCV_LIBS} gemmcl)
 
 add_executable(tests test.cpp utPrediction.cpp blas.c)
-target_link_libraries(tests gemm ${OpenCV_LIBS} ${GTEST_BOTH_LIBRARIES} -mtune=native)
+target_link_libraries(tests gemmcl ${OpenCV_LIBS} ${GTEST_BOTH_LIBRARIES} -mtune=native)
 SET_TARGET_PROPERTIES(tests PROPERTIES COMPILE_FLAGS "-O0 -ggdb")
 
 add_test(AllTests tests)

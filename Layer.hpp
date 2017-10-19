@@ -133,7 +133,8 @@ static inline auto getActivationMethode(const Activation &a) -> float (*)(float)
         case Activation::Relu:
         case Activation::Stair:
         case Activation::Tanh:
-            throw std::invalid_argument("Activation Not handled");
+	    return nullptr;
+            //throw std::invalid_argument("Activation Not handled");
     }
     return nullptr;
 }

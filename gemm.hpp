@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstring> //memset
 
+#if 0
 void gemm_nn(size_t M, size_t N, size_t K, float ALPHA,
              const float *__restrict__ A, int lda,
              const float *__restrict__ B, int ldb,
@@ -43,6 +44,19 @@ static inline void gemm_cpu(size_t M, size_t N, size_t K, float ALPHA,
     else
         gemm_tt(M, N, K, ALPHA,A,lda, B, ldb,C,ldc);
 }
+#else
+#include "common.h"
+
+template <bool transpose_A, bool transpose_B>
+static inline void gemm_cpu(size_t M, size_t N, size_t K, float ALPHA,
+                            const float *__restrict__ A, int lda,
+			    const float *__restrict__ B, int ldb, float BETA,
+			    float *__restrict__ C, int ldc) {
+    libclblas((float *)A, lda, (float*)B, ldb, C, ldc, ALPHA, BETA * 0, K, M, N);
+}
+
+
+#endif
 
 /*    <---- K ---->  <---- N ---->           <---- N ---->
  * ^  /          \    /         \   ^     ^   /          \
