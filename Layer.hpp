@@ -113,7 +113,7 @@ static inline float logistic_activate(float x) { return 1. / (1. + exp(-x)); }
 static inline float leaky_activate(float x) { return x > 0 ? x : .1 * x; }
 static inline float linear_activate(float x) { return x; }
 
-static inline float (*getActivationMethode(Activation a))(float)
+static inline auto getActivationMethode(const Activation &a) -> float (*)(float)
 {
     switch (a) {
         case Activation::Logistic:
@@ -138,8 +138,8 @@ static inline float (*getActivationMethode(Activation a))(float)
     return nullptr;
 }
 
-static inline void activate_array(Activation a, float *x, size_t n) {
-    const auto &activate = getActivationMethode(a);
+static inline void activate_array(const Activation &a, float *x, size_t n) {
+    auto activate = getActivationMethode(a);
     for (size_t i = 0; i < n; ++i) {
         x[i] = activate(x[i]);
     }
