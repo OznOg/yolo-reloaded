@@ -36,8 +36,12 @@ class Setup {
        cl::Program::Sources sources;
 
        // kernel calculates for each element C=A+B
-       std::string kernel_code { R"CLC(
+#define WPT 4
 #define TS 16
+       std::string kernel_code { R"CLC(
+#define WPT 4
+#define TS 16
+#define RTS ((TS) / (WPT))
 __kernel void gemm(const int M, const int N, const int K,
                       const __global float* A,
                       const __global float* B,
@@ -52,35 +56,47 @@ __kernel void gemm(const int M, const int N, const int K,
     __local float Asub[TS][TS];
     __local float Bsub[TS][TS];
 
-    // Initialise the accumulation register
-    float acc = 0.0f;
-    
+    // Initialise the accumulation registers
+    float acc[WPT];
+    for (int w = 0; w < WPT; w++) {
+        acc[w] = 0.0f;
+    }
+
+    // Synchronise before loading the next tile
+    barrier(CLK_LOCAL_MEM_FENCE);
+
     // Loop over all tiles
     const int numTiles = ceil(K / (float)TS);
     for (int t = 0; t < numTiles; t++) {
 
+        const int tiledRow = TS * t;
+        const int tiledCol = TS * t;
         // Load one tile of A and B into local memory
-        const int tiledRow = TS * t + row;
-        const int tiledCol = TS * t + col;
-        Asub[col][row] = tiledCol >= K || globalRow >= M ? 0 : A[tiledCol * M + globalRow];
-        Bsub[col][row] = globalCol >= N || tiledRow >= K ? 0 : B[globalCol * K + tiledRow];
+        for (int w=0; w<WPT; w++) {
+            Asub[col + w * RTS][row] = (tiledCol + col + w*RTS) >= K || globalRow >= M ? 0 : A[(tiledCol + col + w*RTS) * M + globalRow];
+            Bsub[col + w * RTS][row] = (globalCol + w*RTS) >= N || tiledRow + row >= K ? 0 : B[(globalCol + w*RTS) * K + tiledRow + row];
+        }
 
         // Synchronise to make sure the tile is loaded
         barrier(CLK_LOCAL_MEM_FENCE);
 
         // Perform the computation for a single tile
         for (int k = 0; k < TS; k++) {
-            acc += Asub[k][row] * Bsub[col][k];
+            for (int w = 0; w < WPT; w++) {
+                acc[w] += Asub[k][row] * Bsub[col + w * RTS][k];
+            }
         }
-
+ 
         // Synchronise before loading the next tile
         barrier(CLK_LOCAL_MEM_FENCE);
     }
 
-if (globalCol >= N || globalRow >= M)
-return;
-    // Store the final result in C
-    C[globalCol*M + globalRow] = acc;
+    // Store the final results in C
+    for (int w=0; w<WPT; w++) {
+        if ((globalCol + w * RTS) >= N || globalRow >= M)
+            return;
+        C[(globalCol + w * RTS) * M + globalRow] = acc[w];
+    }
 }
                               )CLC"};
 
@@ -157,8 +173,7 @@ void libclblas(float* A, int lda, float* B, int ldb, float* C, int ldc, float AL
     gemmm.setArg(3, bufB);
     gemmm.setArg(5, bufC);
 
-#define TS 16
-    queue.enqueueNDRangeKernel(gemmm, cl::NullRange, cl::NDRange(N + TS - (N % TS), M + TS - (M % TS)), cl::NDRange(TS, TS));
+    queue.enqueueNDRangeKernel(gemmm, cl::NullRange, cl::NDRange(N + TS - (N % TS), (M + TS - (M % TS)) / WPT), cl::NDRange(TS, TS / WPT));
 
     queue.finish();
 
