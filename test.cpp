@@ -103,7 +103,9 @@ TEST(Layers, Convolutional) {
 
     EXPECT_EQ(expected_output.size(), output.size());
 
-    EXPECT_EQ(expected_output, output);
+    size_t idx = 0;
+    for (auto &f : expected_output)
+        EXPECT_NEAR(f, output[idx++], 0.000001);
 }
 
 TEST(Layers, Maxpool) {
