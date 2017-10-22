@@ -11,14 +11,14 @@
 #define TS 16
 
 static const std::string im2col_kernel(R"KERNEL(
-__kernel void im2col_gpu_kernel(const int n, const __global float *data_im,
+__kernel void im2col(const int n, const __global float *data_im,
         const int height, const int width, const int ksize,
         const int pad,
         const int stride,
         const int height_col, const int width_col,
         float __global *data_col) {
-    int index = get_group_id(0) * get_local_size(0) + get_local_id(0);
-    for(; index < n; index += get_local_size(0) * get_global_size(0)) {
+    int index = get_group_id(0) + get_local_id(0);
+    for(; index < n; index += get_local_size(0)) {
         int w_out = index % width_col;
         int h_index = index / width_col;
         int h_out = h_index % height_col;
@@ -36,10 +36,8 @@ __kernel void im2col_gpu_kernel(const int n, const __global float *data_im,
                 int w = w_in + j;
       
                 *data_col_ptr = (h >= 0 && w >= 0 && h < height && w < width) ?
-                    data_im_ptr[i * width + j] : 0;
+                     data_im_ptr[i * width + j] : 0;
 
-                //*data_col_ptr = data_im_ptr[ii * width + jj];
-    
                 data_col_ptr += height_col * width_col;
             }
         }
@@ -217,5 +215,53 @@ void libclblas(float* A, int lda, float* B, int ldb, float* C, int ldc, float AL
 
     // Copy the output matrix C back to the CPU memory
     err = queue.enqueueReadBuffer(bufC, CL_TRUE, 0, M*N*sizeof(*C), C, NULL, NULL);
+}
+
+void im2col_gpu(const float *im, int channels, int height, int width,
+         int ksize, int stride, int pad, float *data_col){
+    // We are going to launch channels * height_col * width_col kernels, each
+    // kernel responsible for copying a single-channel grid.
+    int height_col = (height + 2 * pad - ksize) / stride + 1;
+    int width_col = (width + 2 * pad - ksize) / stride + 1;
+    int num_kernels = channels * height_col * width_col;
+
+    // Configure clBlas
+    auto &instance = Setup::getInstance();
+
+    int err;
+
+    auto &ctx = instance.getCtx();
+    auto &queue = instance.getQueue();
+
+    int K = channels * ksize * ksize;
+    int N = width * height;;
+
+    // Prepare OpenCL memory objects
+    cl::Buffer input(ctx, CL_MEM_READ_ONLY, N * channels * sizeof(*im), NULL, &err);
+    cl::Buffer output(ctx, CL_MEM_READ_WRITE, N * K * sizeof(*data_col), NULL, &err);
+
+    // Copy matrices to the GPU (also C to erase the results of the previous run)
+    err = queue.enqueueWriteBuffer(input, CL_TRUE, 0, N * channels * sizeof(*im), im, NULL, NULL);
+    err = queue.enqueueWriteBuffer(output, CL_TRUE, 0, N * K * sizeof(*data_col), data_col, NULL, NULL);
+
+    cl::Kernel im2col = cl::Kernel(instance.getProgram(), "im2col");
+    im2col.setArg(0, num_kernels);
+    im2col.setArg(1, input);
+    im2col.setArg(2, height);
+    im2col.setArg(3, width);
+    im2col.setArg(4, ksize);
+    im2col.setArg(5, pad);
+    im2col.setArg(6, stride);
+    im2col.setArg(7, height_col);
+    im2col.setArg(8, width_col);
+    im2col.setArg(9, output);
+
+    #define BLOCK 512
+    queue.enqueueNDRangeKernel(im2col, cl::NullRange, cl::NDRange((num_kernels + BLOCK -1) / BLOCK), cl::NDRange(BLOCK));
+
+    queue.finish();
+
+    // Copy the output matrix C back to the CPU memory
+    err = queue.enqueueReadBuffer(output, CL_TRUE, 0, N * K * sizeof(*data_col), data_col, NULL, NULL);
 }
 

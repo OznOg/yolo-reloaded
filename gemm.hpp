@@ -86,6 +86,10 @@ static inline void im2col_cpu(const std::vector<float> &data_im,
         int channels,  int height,  int width,
         int ksize,  int stride, int pad, float *data_col)
 {
+#if 1
+    im2col_gpu(data_im.data(), channels, height, width,
+               ksize, stride, pad, data_col);
+#else
     int height_col = (height + 2*pad - ksize) / stride + 1;
     int width_col =  (width  + 2*pad - ksize) / stride + 1;
 
@@ -115,5 +119,6 @@ static inline void im2col_cpu(const std::vector<float> &data_im,
                 }
         }
     }
+#endif
 }
 
