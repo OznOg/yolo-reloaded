@@ -7,38 +7,46 @@
 #include <string>
 #include <vector>
 
-class Setup {
-    Setup() {
-       // get all platforms (drivers)
-       std::vector<cl::Platform> all_platforms;
-       cl::Platform::get(&all_platforms);
-       if (all_platforms.empty()) {
-           throw "No platforms found. Check OpenCL installation!\n";
-       }
-       cl::Platform default_platform = all_platforms[0];
-
-       //get default device of the default platform
-       std::vector<cl::Device> all_devices;
-       default_platform.getDevices(CL_DEVICE_TYPE_GPU, &all_devices);
-       if (all_devices.empty()) {
-           throw " No devices found. Check OpenCL installation!\n";
-       }
-       cl::Device default_device = all_devices[0];
-
-       cl::Context context{default_device};
-
-       //create queue to which we will push commands for the device.
-       cl::CommandQueue queue(context, default_device);
-
-       _ctx = context;
-       _queue = queue;
-
-       cl::Program::Sources sources;
-
-       // kernel calculates for each element C=A+B
 #define WPT 4
 #define TS 16
-       std::string kernel_code { R"CLC(
+
+static const std::string im2col_kernel(R"KERNEL(
+__kernel void im2col_gpu_kernel(const int n, const __global float *data_im,
+        const int height, const int width, const int ksize,
+        const int pad,
+        const int stride,
+        const int height_col, const int width_col,
+        float __global *data_col) {
+    int index = get_group_id(0) * get_local_size(0) + get_local_id(0);
+    for(; index < n; index += get_local_size(0) * get_global_size(0)) {
+        int w_out = index % width_col;
+        int h_index = index / width_col;
+        int h_out = h_index % height_col;
+        int channel_in = h_index / height_col;
+        int channel_out = channel_in * ksize * ksize;
+        int h_in = h_out * stride - pad;
+        int w_in = w_out * stride - pad;
+        __global float* data_col_ptr = data_col;
+        data_col_ptr += (channel_out * height_col + h_out) * width_col + w_out;
+        const __global float* data_im_ptr = data_im;
+        data_im_ptr += (channel_in * height + h_in) * width + w_in;
+        for (int i = 0; i < ksize; ++i) {
+            for (int j = 0; j < ksize; ++j) {
+                int h = h_in + i;
+                int w = w_in + j;
+      
+                *data_col_ptr = (h >= 0 && w >= 0 && h < height && w < width) ?
+                    data_im_ptr[i * width + j] : 0;
+
+                //*data_col_ptr = data_im_ptr[ii * width + jj];
+    
+                data_col_ptr += height_col * width_col;
+            }
+        }
+    }
+})KERNEL");
+
+static const std::string gemm_kernel(R"KERNEL(
 #define WPT 4
 #define TS 16
 #define RTS ((TS) / (WPT))
@@ -98,7 +106,37 @@ __kernel void gemm(const int M, const int N, const int K,
         C[(globalCol + w * RTS) * M + globalRow] = acc[w];
     }
 }
-                              )CLC"};
+)KERNEL");
+
+class Setup {
+    Setup() {
+       // get all platforms (drivers)
+       std::vector<cl::Platform> all_platforms;
+       cl::Platform::get(&all_platforms);
+       if (all_platforms.empty()) {
+           throw "No platforms found. Check OpenCL installation!\n";
+       }
+       cl::Platform default_platform = all_platforms[0];
+
+       //get default device of the default platform
+       std::vector<cl::Device> all_devices;
+       default_platform.getDevices(CL_DEVICE_TYPE_GPU, &all_devices);
+       if (all_devices.empty()) {
+           throw " No devices found. Check OpenCL installation!\n";
+       }
+       cl::Device default_device = all_devices[0];
+
+       cl::Context context{default_device};
+
+       //create queue to which we will push commands for the device.
+       cl::CommandQueue queue(context, default_device);
+
+       _ctx = context;
+       _queue = queue;
+
+       cl::Program::Sources sources;
+
+       std::string kernel_code = gemm_kernel + im2col_kernel;
 
        sources.push_back({kernel_code.c_str(), kernel_code.length()});
 
