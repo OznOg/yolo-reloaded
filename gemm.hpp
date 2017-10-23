@@ -67,18 +67,6 @@ void gemm(size_t M, size_t N, size_t K, float ALPHA,
 
 #include <vector>
 
-static inline float im2col_get_pixel(const std::vector<float> &im, int height, int width,
-                                     int row, int col, int channel, int pad)
-{
-    row -= pad;
-    col -= pad;
-
-    if (row < 0 || col < 0 || row >= height || col >= width)
-        return 0; // missing pixels are extrapolated by black pixels
-
-    return im[col + width * (row + height * channel)];
-}
-
 //From Berkeley Vision's Caffe!
 //https://github.com/BVLC/caffe/blob/master/LICENSE
 static inline void im2col_cpu(const std::vector<float> &data_im,
@@ -99,14 +87,15 @@ static inline void im2col_cpu(const std::vector<float> &data_im,
         int c_im = c / ksize / ksize;
 
         for (int h = 0; h < height_col; ++h) {
+            int row = h_offset + h * stride - pad;
             for (int w = 0; w < width_col; ++w) {
-                int im_row = h_offset + h * stride;
-                int im_col = w_offset + w * stride;
+                int col = w_offset + w * stride - pad;
 
                 int col_index = (c * height_col + h) * width_col + w;
-
-                data_col[col_index] = im2col_get_pixel(data_im, height, width,
-                        im_row, im_col, c_im, pad);
+                if (row < 0 || col < 0 || row >= height || col >= width)
+                    data_col[col_index] = 0;
+                else
+                    data_col[col_index] = data_im[col + width * (row + height * c_im)];
             }
         }
     }
