@@ -1,5 +1,6 @@
 #pragma once
 #include <cstddef>
+#include <cstring> //memset
 
 void gemm_nn(size_t M, size_t N, size_t K, float ALPHA,
              const float *__restrict__ A, int lda,
@@ -67,8 +68,6 @@ void gemm(size_t M, size_t N, size_t K, float ALPHA,
 
 #include <vector>
 
-//From Berkeley Vision's Caffe!
-//https://github.com/BVLC/caffe/blob/master/LICENSE
 static inline void im2col_cpu(const std::vector<float> &data_im,
         int channels,  int height,  int width,
         int ksize,  int stride, int pad, float *data_col)
@@ -88,15 +87,18 @@ static inline void im2col_cpu(const std::vector<float> &data_im,
 
         for (int h = 0; h < height_col; ++h) {
             int row = h_offset + h * stride - pad;
-            for (int w = 0; w < width_col; ++w) {
-                int col = w_offset + w * stride - pad;
+            int col_index = (c * height_col + h) * width_col;
+            if (row < 0 || row >= height) {
+                std::memset(&data_col[col_index], 0, width_col);
+            } else
+                for (int w = 0; w < width_col; ++w) {
+                    int col = w_offset + w * stride - pad;
 
-                int col_index = (c * height_col + h) * width_col + w;
-                if (row < 0 || col < 0 || row >= height || col >= width)
-                    data_col[col_index] = 0;
-                else
-                    data_col[col_index] = data_im[col + width * (row + height * c_im)];
-            }
+                    if (col < 0 || col >= width)
+                        data_col[col_index + w] = 0;
+                    else
+                        data_col[col_index + w] = data_im[col + width * (row + height * c_im)];
+                }
         }
     }
 }
