@@ -11,34 +11,36 @@
 #define TS 16
 
 static const std::string im2col_kernel(R"KERNEL(
-__kernel void im2col(const int n, const __global float *data_im,
+__kernel void im2col(const int K, const __global float *data_im,
         const int height, const int width, const int ksize,
         const int pad,
         const int stride,
-        const int height_col, const int width_col,
+        int height_col, int width_col,
         float __global *data_col) {
-    int index = get_group_id(0) + get_local_id(0);
-    for(; index < n; index += get_local_size(0)) {
-        int w_out = index % width_col;
-        int h_index = index / width_col;
-        int h_out = h_index % height_col;
-        int channel_in = h_index / height_col;
-        int channel_out = channel_in * ksize * ksize;
-        int h_in = h_out * stride - pad;
-        int w_in = w_out * stride - pad;
-        __global float* data_col_ptr = data_col;
-        data_col_ptr += (channel_out * height_col + h_out) * width_col + w_out;
-        const __global float* data_im_ptr = data_im;
-        data_im_ptr += (channel_in * height + h_in) * width + w_in;
-        for (int i = 0; i < ksize; ++i) {
-            for (int j = 0; j < ksize; ++j) {
-                int h = h_in + i;
-                int w = w_in + j;
-      
-                *data_col_ptr = (h >= 0 && w >= 0 && h < height && w < width) ?
-                     data_im_ptr[i * width + j] : 0;
+    int c = get_group_id(0) * 8 + get_local_id(0);
 
-                data_col_ptr += height_col * width_col;
+     if (c < K) {
+        int w_offset = c % ksize;
+
+        int h_offset = (c / ksize) % ksize;
+
+        int c_im = c / ksize / ksize;
+
+        for (int h = 0; h < height_col; ++h) {
+            int row = h_offset + h * stride - pad;
+            int col_index = (c * height_col + h) * width_col;
+            if (row < 0 || row >= height) {
+                for (int w = 0; w < width_col; ++w) {
+                   data_col[col_index + w] = 0;
+                }
+            } else
+              for (int w = 0; w < width_col; ++w) {
+                int col = w_offset + w * stride - pad;
+
+                if (col < 0 || col >= width)
+                    data_col[col_index + w] = 0;
+                else
+                    data_col[col_index + w] = data_im[col + width * (row + height * c_im)];
             }
         }
     }
@@ -223,7 +225,6 @@ void im2col_gpu(const float *im, int channels, int height, int width,
     // kernel responsible for copying a single-channel grid.
     int height_col = (height + 2 * pad - ksize) / stride + 1;
     int width_col = (width + 2 * pad - ksize) / stride + 1;
-    int num_kernels = channels * height_col * width_col;
 
     // Configure clBlas
     auto &instance = Setup::getInstance();
@@ -242,10 +243,9 @@ void im2col_gpu(const float *im, int channels, int height, int width,
 
     // Copy matrices to the GPU (also C to erase the results of the previous run)
     err = queue.enqueueWriteBuffer(input, CL_TRUE, 0, N * channels * sizeof(*im), im, NULL, NULL);
-    err = queue.enqueueWriteBuffer(output, CL_TRUE, 0, N * K * sizeof(*data_col), data_col, NULL, NULL);
 
     cl::Kernel im2col = cl::Kernel(instance.getProgram(), "im2col");
-    im2col.setArg(0, num_kernels);
+    im2col.setArg(0, K);
     im2col.setArg(1, input);
     im2col.setArg(2, height);
     im2col.setArg(3, width);
@@ -256,8 +256,8 @@ void im2col_gpu(const float *im, int channels, int height, int width,
     im2col.setArg(8, width_col);
     im2col.setArg(9, output);
 
-    #define BLOCK 512
-    queue.enqueueNDRangeKernel(im2col, cl::NullRange, cl::NDRange((num_kernels + BLOCK -1) / BLOCK), cl::NDRange(BLOCK));
+    size_t BLOCK = 8;
+    queue.enqueueNDRangeKernel(im2col, cl::NullRange, cl::NDRange(K + BLOCK - (K % BLOCK)), cl::NDRange(BLOCK));
 
     queue.finish();
 
