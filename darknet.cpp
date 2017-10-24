@@ -162,8 +162,8 @@ bool run_detect(const std::vector<std::string> &_args) {
         const Box &b = correctScale(p.box, imageInteger.cols, imageInteger.rows, net->_input_size.width, net->_input_size.height);
         drawDetection(imageInteger, class2name[p.classIndex], b);
     }
-    cv::imshow("Predictions", imageInteger);
-    cv::waitKey();
+    //cv::imshow("Predictions", imageInteger);
+    //cv::waitKey();
 
     return true;
 }
