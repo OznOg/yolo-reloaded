@@ -178,7 +178,7 @@ int main(int argc, char **argv) {
     }
 
     if (args[1] != "detect") {
-	std::cerr << "Error: Only detector is supported as function for now." << std::endl << std::endl;
+	std::cerr << "Error: Only detect is supported as function for now." << std::endl << std::endl;
 	return 2;
     }
 
