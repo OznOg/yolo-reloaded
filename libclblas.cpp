@@ -100,10 +100,10 @@ __kernel void gemm(const int M, const int N, const int K,
     }
 
     // Store the final results in C
-    for (int w=0; w<WPT; w++) {
-        if ((globalCol + w * RTS) >= N || globalRow >= M)
-            return;
-        C[(globalCol + w * RTS) * M + globalRow] = acc[w];
+    if (globalRow >= M)
+        return;
+    for (int w = 0; w < WPT * RTS && (globalCol + w) < N; w += RTS) {
+        C[(globalCol + w) * M + globalRow] = acc[w / RTS];
     }
 }
 )KERNEL");
