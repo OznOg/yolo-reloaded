@@ -114,7 +114,7 @@ class Setup {
        std::vector<cl::Platform> all_platforms;
        cl::Platform::get(&all_platforms);
        if (all_platforms.empty()) {
-           throw "No platforms found. Check OpenCL installation!\n";
+           throw std::runtime_error("No platforms found. Check OpenCL installation!\n");
        }
        cl::Platform default_platform = all_platforms[0];
 
@@ -122,7 +122,7 @@ class Setup {
        std::vector<cl::Device> all_devices;
        default_platform.getDevices(CL_DEVICE_TYPE_GPU, &all_devices);
        if (all_devices.empty()) {
-           throw " No devices found. Check OpenCL installation!\n";
+           throw std::runtime_error("No devices found. Check OpenCL installation!\n");
        }
        cl::Device default_device = all_devices[0];
 
@@ -145,7 +145,7 @@ class Setup {
            std::string error;
            _program.getBuildInfo(default_device, CL_PROGRAM_BUILD_LOG, &error);
            std::cerr << error << std::endl;
-           throw "Error building kernel\n";
+           throw std::runtime_error("Error building kernel\n");
        }
     }
 
