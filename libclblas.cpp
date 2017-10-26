@@ -80,9 +80,20 @@ __kernel void gemm(const int M, const int N, const int K,
         const int tiledRow = TS * t;
         const int tiledCol = TS * t;
         // Load one tile of A and B into local memory
-        for (int w=0; w<WPT; w++) {
-            Asub[col + w * RTS][row] = (tiledCol + col + w*RTS) >= K || globalRow >= M ? 0 : A[(tiledCol + col + w*RTS) * M + globalRow];
-            Bsub[col + w * RTS][row] = (globalCol + w*RTS) >= N || tiledRow + row >= K ? 0 : B[(globalCol + w*RTS) * K + tiledRow + row];
+        for (int w = 0; w < WPT; w++) {
+            int a_col = (tiledCol + col + w * RTS);
+            int a_row = globalRow;
+            int b_col = (globalCol + w * RTS);
+            int b_row = tiledRow + row;
+            if (a_col >= K || a_row >= M)
+                Asub[col + w * RTS][row] = 0;
+            else
+                Asub[col + w * RTS][row] = A[a_col * M + a_row];
+
+            if (b_col >= N || b_row >= K)
+                Bsub[col + w * RTS][row] = 0;
+            else
+                Bsub[col + w * RTS][row] = B[b_col * K + b_row];
         }
 
         // Synchronise to make sure the tile is loaded
