@@ -43,13 +43,10 @@ __kernel void im2col(const int K, const __global float *data_im,
     }
 })KERNEL");
 
-#define WPT 4
 #define TS 16
 
 static const std::string gemm_kernel(R"KERNEL(
-#define WPT 4
 #define TS 16
-#define RTS ((TS) / (WPT))
 __kernel void gemm(const int M, const int N, const int K,
                       const __global float* A,
                       const __global float* B,
@@ -61,8 +58,8 @@ __kernel void gemm(const int M, const int N, const int K,
     const int globalCol = TS*get_group_id(1) + col; // Col ID of C (0..N)
 
     // Local memory to fit a tile of TS*TS elements of A and B
-    __local float Asub[TS][TS];
-    __local float Bsub[TS][TS];
+    __local float Asub[TS * 4][TS];
+    __local float Bsub[TS][TS * 4];
 
     // Initialise the accumulation registers
     float acc = 0;
@@ -71,28 +68,30 @@ __kernel void gemm(const int M, const int N, const int K,
     barrier(CLK_LOCAL_MEM_FENCE);
 
     // Loop over all tiles
-    const int numTiles = ceil(K / (float)TS);
+    const int numTiles = ceil(K / (float)(TS * 4));
     for (int t = 0; t < numTiles; t++) {
 
-        const int tiledRow = TS * t;
-        const int tiledCol = TS * t;
+        const int tiledRow = TS * t * 4;
+        const int tiledCol = TS * t * 4;
         // Load one tile of A and B into local memory
-        if (tiledCol + col >= K || globalRow >= M)
-            Asub[row][col] = 0;
-        else              
-            Asub[row][col] = A[(tiledCol + col) + K * globalRow];
+        for (int w = 0; w < 4; w++) {
+            if (tiledCol + col + TS * w >= K || globalRow >= M)
+                Asub[col + TS * w][row] = 0;
+            else                      
+                Asub[col + TS * w][row] = A[(tiledCol + col + TS * w) + K * globalRow];
 
-        if (globalCol >= N || tiledRow + row >= K)
-            Bsub[row][col] = 0;
-        else              
-            Bsub[row][col] = B[globalCol + N * (tiledRow + row)];
+            if (globalCol >= N || tiledRow + row + TS * w >= K)
+                Bsub[col][row + TS * w] = 0;
+            else                      
+                Bsub[col][row + TS * w] = B[globalCol + N * (tiledRow + row + TS * w)];
+        }
 
         // Synchronise to make sure the tile is loaded
         barrier(CLK_LOCAL_MEM_FENCE);
 
         // Perform the computation for a single tile
-        for (int k = 0; k < TS; k++) {
-            acc += Asub[row][k] * Bsub[k][col];
+        for (int k = 0; k < TS * 4; k++) {
+            acc += Asub[k][row] * Bsub[col][k];
         }
  
         // Synchronise before loading the next tile
