@@ -7,9 +7,6 @@
 #include <string>
 #include <vector>
 
-#define WPT 4
-#define TS 16
-
 static const std::string im2col_kernel(R"KERNEL(
 __kernel void im2col(const int K, const __global float *data_im,
         const int height, const int width, const int ksize,
@@ -46,6 +43,9 @@ __kernel void im2col(const int K, const __global float *data_im,
     }
 })KERNEL");
 
+#define WPT 4
+#define TS 16
+
 static const std::string gemm_kernel(R"KERNEL(
 #define WPT 4
 #define TS 16
@@ -65,10 +65,7 @@ __kernel void gemm(const int M, const int N, const int K,
     __local float Bsub[TS][TS];
 
     // Initialise the accumulation registers
-    float acc[WPT];
-    for (int w = 0; w < WPT; w++) {
-        acc[w] = 0.0f;
-    }
+    float acc = 0;
 
     // Synchronise before loading the next tile
     barrier(CLK_LOCAL_MEM_FENCE);
@@ -80,30 +77,22 @@ __kernel void gemm(const int M, const int N, const int K,
         const int tiledRow = TS * t;
         const int tiledCol = TS * t;
         // Load one tile of A and B into local memory
-        for (int w = 0; w < WPT; w++) {
-            int a_col = col + w * RTS;
-            int a_row = globalRow;
-            int b_col = w * RTS;
-            int b_row = tiledRow + row;
-            if (tiledCol + a_col >= K || a_row >= M)
-                Asub[a_col][row] = 0;
-            else
-                Asub[a_col][row] = A[(tiledCol + a_col) * M + a_row];
+        if (tiledCol + col >= K || globalRow >= M)
+            Asub[row][col] = 0;
+        else              
+            Asub[row][col] = A[(tiledCol + col) + K * globalRow];
 
-            if ((globalCol + b_col) >= N || b_row >= K)
-                Bsub[col + b_col][row] = 0;
-            else
-                Bsub[col + b_col][row] = B[(globalCol + b_col) * K + b_row];
-        }
+        if (globalCol >= N || tiledRow + row >= K)
+            Bsub[row][col] = 0;
+        else              
+            Bsub[row][col] = B[globalCol + N * (tiledRow + row)];
 
         // Synchronise to make sure the tile is loaded
         barrier(CLK_LOCAL_MEM_FENCE);
 
         // Perform the computation for a single tile
         for (int k = 0; k < TS; k++) {
-            for (int w = 0; w < WPT; w++) {
-                acc[w] += Asub[k][row] * Bsub[col + w * RTS][k];
-            }
+            acc += Asub[row][k] * Bsub[k][col];
         }
  
         // Synchronise before loading the next tile
@@ -111,11 +100,9 @@ __kernel void gemm(const int M, const int N, const int K,
     }
 
     // Store the final results in C
-    if (globalRow >= M)
+    if (globalRow >= M || globalCol >= N)
         return;
-    for (int w = 0; w < WPT * RTS && (globalCol + w) < N; w += RTS) {
-        C[(globalCol + w) * M + globalRow] = acc[w / RTS];
-    }
+    C[globalCol + N * globalRow] = acc;
 }
 )KERNEL");
 
@@ -215,14 +202,14 @@ void libclblas(float* A, int lda, float* B, int ldb, float* C, int ldc, float AL
     err = queue.enqueueWriteBuffer(bufC, CL_TRUE, 0, M*N*sizeof(*C), C, NULL, NULL);
 
     cl::Kernel gemmm = cl::Kernel(instance.getProgram(), "gemm");
-    gemmm.setArg(1, M);
-    gemmm.setArg(0, N);
+    gemmm.setArg(0, M);
+    gemmm.setArg(1, N);
     gemmm.setArg(2, K);
-    gemmm.setArg(4, bufA);
-    gemmm.setArg(3, bufB);
+    gemmm.setArg(3, bufA);
+    gemmm.setArg(4, bufB);
     gemmm.setArg(5, bufC);
 
-    queue.enqueueNDRangeKernel(gemmm, cl::NullRange, cl::NDRange(N + TS - (N % TS), (M + TS - (M % TS)) / WPT), cl::NDRange(TS, TS / WPT));
+    queue.enqueueNDRangeKernel(gemmm, cl::NullRange, cl::NDRange(M + TS - (M % TS), N + TS - (N % TS)), cl::NDRange(TS, TS));
 
     queue.finish();
 
