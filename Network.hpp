@@ -151,7 +151,7 @@ public:
           .read((char *)&revision, sizeof(revision));
 
         if ((major * 10 + minor) >= 2) {
-            in.read((char *)_seen, sizeof(_seen));
+            in.read((char *)&_seen, sizeof(_seen));
         } else {
             int iseen = 0;
             in.read((char *)&iseen, sizeof(iseen));
