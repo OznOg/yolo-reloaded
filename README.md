@@ -18,3 +18,5 @@ Obviously, this may change depending on the impediments/needs encountered during
 
 Feel free to email me about any remarks and to propose patches (even a single line patch can change everything)
 
+As you may see, this project is stalled, mainly because I do not own the necessary hardware to be able to go further... I don't have a Nvidia card and I'm using a laptop... making tests quite painful especially for the learning part.
+
